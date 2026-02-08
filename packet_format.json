@@ -1,0 +1,77 @@
+{
+  "delimiter": ",",
+  "fields": [
+    {
+      "name": "TEAM_ID",
+      "type": "str"
+    },
+    {
+      "name": "TIME_SINCE_S",
+      "type": "float"
+    },
+    {
+      "name": "ALTITUDE_M",
+      "type": "float"
+    },
+    {
+      "name": "PRESSURE_PA",
+      "type": "float"
+    },
+    {
+      "name": "TEMP_C",
+      "type": "float"
+    },
+    {
+      "name": "VOLTAGE",
+      "type": "float"
+    },
+    {
+      "name": "IST",
+      "type": "str"
+    },
+    {
+      "name": "GNSS_LAT",
+      "type": "float"
+    },
+    {
+      "name":"LAT_DIR",
+      "type":"str" 
+    },
+    {
+      "name": "GNSS_LON",
+      "type": "float"
+    },
+    {
+      "name":"LON_DIR",
+      "type":"str" 
+    },
+    {
+      "name": "GNSS_SATS",
+      "type": "int"
+    },
+    {
+      "name": "GNSS_ALT_M",
+      "type": "float"
+    },
+    {
+      "name": "ROLL_DEG",
+      "type": "float"
+    },
+    {
+      "name": "PITCH_DEG",
+      "type": "float"
+    },
+    {
+      "name": "YAW",
+      "type": "float"
+    },
+    {
+      "name": "RECOVERY",
+      "type": "int"
+    },
+    {
+      "name": "PACKET_COUNT",
+      "type": "str"
+    }
+  ]
+}
