@@ -5,7 +5,7 @@ Real-Time Telemetry Visualization & Processing System
 
 ## 📌 Overview
 
-This project is a Python-based real-time ground station designed for a CANSAT mission.  
+This project is a Python-based real-time ground station designed for a VSLV and VSAT project.  
 It evolved from a basic serial telemetry viewer into a configurable, mission-aware telemetry console with:
 
 - Dynamic packet parsing
@@ -15,11 +15,34 @@ It evolved from a basic serial telemetry viewer into a configurable, mission-awa
 - Performance instrumentation
 - Adaptive CSV logging
 
-The latest refined implementations can be seen in:
-- :contentReference[oaicite:0]{index=0}  
-- :contentReference[oaicite:1]{index=1}  
-- :contentReference[oaicite:2]{index=2}  
+## Instruction to the contributors 
 
+---
+
+Read the whole readme file carefully 
+dont rush into making changes...
+
+So here how you start if you are a beginner (This part can be skipped):
+    **The master or the main branch must not be changed without the approval of the author** 
+    1) Fork the repository 
+    2) Clone the repository into your system
+    3) Fetch the develop branch from the remote repository 
+    4) create the virtual environment and install the required library 
+    5) Now you are ready to make contributions 
+
+---
+
+## Instructions for the users of the groundstation
+---
+     create a virtual environment
+
+     Install the required libraries mentioned in the requirements.txt file 
+     
+     make sure any other is not using the serial port like the serial monitor in the aeduino IDE
+
+     run the file and work on the GUI of the dashboard to run the Ground station
+
+     make sure to use the latest python file <app(greatest_int)_Final_(cansat/Rocket.py)>
 ---
 
 # 🧭 Development Timeline & Refinements
