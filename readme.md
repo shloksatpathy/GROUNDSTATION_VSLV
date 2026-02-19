@@ -18,16 +18,21 @@ It evolved from a basic serial telemetry viewer into a configurable, mission-awa
 ## Instruction to the contributors 
 
 ---
-
+ **The master or the main branch must not be changed without the approval of the author** 
+ 
 Read the whole readme file carefully 
 dont rush into making changes...
 
-So here how you start if you are a beginner (This part can be skipped):
-    **The master or the main branch must not be changed without the approval of the author** 
+Here how you start if you are a beginner (This part can be skipped): 
+
     1) Fork the repository 
+
     2) Clone the repository into your system
-    3) Fetch the develop branch from the remote repository 
+
+    3) Fetch the develop branch from the remote repository
+
     4) create the virtual environment and install the required library 
+
     5) Now you are ready to make contributions 
 
 ---
