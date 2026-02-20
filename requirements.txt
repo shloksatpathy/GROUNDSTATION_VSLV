@@ -1,5 +1,7 @@
 pandas 
 PyQt5
-pyqtserial
+PyQtWebEngine
+pyserial 
+pyqtgraph
 folium
 serial
