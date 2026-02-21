@@ -333,7 +333,21 @@ class Groundstation(QtWidgets.QMainWindow):
         self.plot_p_alt = pg.PlotWidget(title="Pressure vs Altitude")
         self.plot_t_alt = pg.PlotWidget(title="Temp vs Altitude")
 
-        for pw in (self.plot_p_alt, self.plot_t_alt, self.plot_alt, self.plot_pres, self.plot_temp, self.plot_roll, self.plot_pitch, self.plot_yaw):
+        self.plot_roll.setYRange(-180, 180)
+        self.plot_pitch.setYRange(-90, 90)
+        self.plot_yaw.setYRange(-180, 180)
+
+        self.plot_roll.enableAutoRange(axis='y', enable=False)
+        self.plot_pitch.enableAutoRange(axis='y', enable=False)
+        self.plot_yaw.enableAutoRange(axis='y', enable=False)
+
+        # auto range for the x- axis for the plots 
+        self.plot_roll.enableAutoRange(axis='x', enable=True)
+        self.plot_pitch.enableAutoRange(axis='x', enable=True)
+        self.plot_yaw.enableAutoRange(axis='x', enable=True)
+
+
+        for pw in (self.plot_p_alt, self.plot_t_alt, self.plot_alt, self.plot_pres, self.plot_temp):
             pw.setMinimumHeight(160); pw.getPlotItem().showGrid(x=True, y=True, alpha=0.2)
             pw.enableAutoRange(axis='x', enable=True)
             pw.enableAutoRange(axis='y', enable=True)
