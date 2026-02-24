@@ -249,7 +249,7 @@ class Groundstation(QtWidgets.QMainWindow):
         self.ser = None
         #additon of Kalman filtered altitude call for the altitude plot
         self.kalman = altitudeKalmanFilter(
-            process_var=0.3
+            process_var=0.3,
             measurement_var=15.0
 
         )
