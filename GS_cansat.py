@@ -10,6 +10,7 @@ import pyqtgraph as pg
 import folium
 import serial
 import serial.tools.list_ports
+import numpy as np 
 
 # ---------------- Config ----------------
 CSV_PATH = "Flight_2024ASI-CANSAT0032.csv"
@@ -184,6 +185,51 @@ def great_circle_points(lat1, lon1, lat2, lon2, n_points=100):
         points.append([math.degrees(φi), math.degrees(λi)])
     return points
 
+
+class altitudeKalmanFilter:
+    def __init__(self, process_var=0.5, measurement_var=10):
+        #state: [altitude, velocity]
+        self.x = np.array([[0, 0],
+                          [0, 0]])
+        
+
+        #estimation covariance
+        self.p = np.eye(2)* 500
+
+        #process noise
+        self.Q_base = np.eye(2)* process_var
+
+        #measurement noise
+        self.R = np.array([[measurement_var]])
+
+        #measurement matrix
+        self.H = np.array([[1, 0]])
+
+        self.initialised = False
+
+    def update(self, measured_altitude, dt):
+        if not self.initialised:
+            self.x[0,0] = measured_altitude
+            self.initialised = True
+
+        
+        F = np.array([[1, dt],
+                      [0, 1]])
+
+        #predict
+        self.x = F @ self.x
+        self.p = F @ self.P @ F.T + self.Q_base
+
+        #update 
+        z = np.array([[measured_altitude]])
+        y = z - (self.H @ self.x)
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+
+        self.x = self.x + K @ y
+        self.P = (np.eye(2) - K @ self.H) @ self.P
+
+        return self.x[0, 0], self.x[1, 0]
 # ---------------- Haversine distance ----------------
 def haversine_m(lat1, lon1, lat2, lon2):
     """Return distance in meters between two lat/lon points (Haversine)."""
@@ -201,10 +247,15 @@ class Groundstation(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.ser = None
+        #additon of Kalman filtered altitude call for the altitude plot
+        self.kalman = altitudeKalmanFilter(
+            process_var=0.3
+            measurement_var=15.0
 
+        )
+        self.prev_kf_time = None
         # bounded in-memory buffer
         self.buffer = deque(maxlen=2000)
-
         # load dynamic packet format
         self.packet_fmt = load_packet_format()
         self.columns = ["TIMESTAMP"] + [f["name"] for f in self.packet_fmt.get("fields", [])]
@@ -486,6 +537,9 @@ class Groundstation(QtWidgets.QMainWindow):
     def start_recording(self):
         self.recording = True
         self.flight_state = "idle"
+        self.kalman = altitudeKalmanFilter(0.3, 15.0)
+        self.prev_kf_time = None
+
 
     def stop_recording(self):
         self.recording = False
@@ -894,7 +948,7 @@ class Groundstation(QtWidgets.QMainWindow):
                     if any(a is not None for a in alt_vals):
                         x_a = [times_w[i] for i, a in enumerate(alt_vals) if a is not None]
                         y_a = [a for a in alt_vals if a is not None]
-                        self.cur_alt.setData(x_a, y_a)
+                        self.cur_alt.setData(times_w, filtered_altitudes)
                     else:
                         self.cur_alt.clear()
 
@@ -919,7 +973,7 @@ class Groundstation(QtWidgets.QMainWindow):
                 print("individual time-series plot error:", e)
 
             # --- Vertical speed calculation & plot (auto-range) ---
-            try:
+            """ try:
                 vs_x = []
                 vs_y = []
                 if times_w:
@@ -964,7 +1018,32 @@ class Groundstation(QtWidgets.QMainWindow):
                     self.cur_vspeed.clear()
                 except Exception:
                     pass
+"""
+            filtered_altitudes = []
+            filtered_velocities = []
 
+            if times_w and alt_vals:
+                for i in range(len(times_w)):
+                    raw_alt = alt_vals[i]
+                    if raw_alt is None:
+                        filtered_altitudes.append(None)
+                        filtered_velocities.append(None)
+                        continue
+
+                    current_time = times_w[i]
+
+                    if self.prev_kf_time is None:
+                        self.prev_kf_time = current_time
+                        filtered_alt, filtered_vel = self.kalman.update(raw_alt, 0.01)
+                    else:
+                        dt = current_time - self.prev_kf_time
+                        self.prev_kf_time = current_time
+                        if dt <= 0:
+                            dt = 0.01
+                        filtered_alt, filtered_vel = self.kalman.update(raw_alt, dt)
+
+                    filtered_altitudes.append(filtered_alt)
+                    filtered_velocities.append(filtered_vel)
             # --- Roll / Pitch / Yaw plot updates (separate plots; auto-range) ---
             try:
                 roll = []

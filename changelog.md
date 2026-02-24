@@ -179,6 +179,20 @@ Versions represent architectural evolution stages.
 - Real-time responsive
 - Competition-ready
 
+
+
+
+## [v2.0.1] - Additon of kalman filter for the altitude and the vertical speed plots estimation
+### added 
+- Kalman filter for the estimation of the vertical speed and altitude 
+
+
+### Impact
+- No big spikes in the altitude plot 
+- smooth curve for the vertical speed plot with minimised noise 
+
+
+
 ---
 
 # 🚀 Upcoming (Planned)
