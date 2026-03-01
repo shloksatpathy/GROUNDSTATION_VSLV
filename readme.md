@@ -50,7 +50,7 @@ Here how you start if you are a beginner (This part can be skipped):
      make sure to use the latest python file <app(greatest_int)_Final_(cansat/Rocket.py)>
 ---
 
-# 🧭 Development Timeline & Refinements
+#  Development Timeline & Refinements
 
 ---
 
@@ -83,12 +83,7 @@ Here how you start if you are a beginner (This part can be skipped):
 - Header detection from telemetry stream
 
 ### Impact
-System transitioned from:
-.....
-
-to:
-
-
+System transitioned to handle dynamic packet formatting
 ---
 
 ##  Version 3 – Robust Parsing & Error Handling
@@ -130,12 +125,7 @@ Improved reliability under noisy telemetry conditions.
 - Distance label overlay
 
 ### Evolution
-Map upgraded from:
-
-
-to:
-
-
+Map functioning upgraded
 ---
 
 ##  Version 6 – Derived Telemetry (Vertical Speed)
@@ -249,25 +239,6 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 - Performance latency tracking
 - Dynamic CSV schema handling
 - Dual-map geospatial visualization
-
----
-
-# 📂 Key Files (Latest Stable Implementations)
-
-- :contentReference[oaicite:3]{index=3} – Intermediate structured version  
-- :contentReference[oaicite:4]{index=4} – Geodesic + vertical speed refined  
-- :contentReference[oaicite:5]{index=5} – Final integrated CANSAT console  
-
----
-
-# 🚀 Future Improvements (Planned)
-
-- Modular architecture separation
-- Threaded serial reader
-- Kalman filter for altitude smoothing
-- Telemetry replay mode
-- Anomaly detection system
-- Map performance optimization (Leaflet JS injection)
 
 ---
 
