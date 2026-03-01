@@ -3,7 +3,7 @@ Real-Time Telemetry Visualization & Processing System
 
 ---
 
-## 📌 Overview
+## Overview
 
 This project is a Python-based real-time ground station designed for a VSLV and VSAT project.  
 It evolved from a basic serial telemetry viewer into a configurable, mission-aware telemetry console with:
@@ -54,7 +54,7 @@ Here how you start if you are a beginner (This part can be skipped):
 
 ---
 
-## 🔹 Version 1 – Basic Telemetry Viewer
+##  Version 1 – Basic Telemetry Viewer
 
 ### Features
 - Serial communication using `pyserial`
@@ -73,7 +73,7 @@ Here how you start if you are a beginner (This part can be skipped):
 
 ---
 
-## 🔹 Version 2 – Dynamic Packet Format
+##  Version 2 – Dynamic Packet Format
 
 ### Major Upgrade
 - Introduced `packet_format.json`
@@ -86,7 +86,7 @@ Here how you start if you are a beginner (This part can be skipped):
 System transitioned to handle dynamic packet formatting
 ---
 
-## 🔹 Version 3 – Robust Parsing & Error Handling
+##  Version 3 – Robust Parsing & Error Handling
 
 ### Improvements
 - Regex-based numeric extraction
@@ -100,7 +100,7 @@ Improved reliability under noisy telemetry conditions.
 
 ---
 
-## 🔹 Version 4 – Sliding Window Plotting
+##  Version 4 – Sliding Window Plotting
 
 ### Added
 - `WINDOW_SEC` parameter
@@ -115,7 +115,7 @@ Improved reliability under noisy telemetry conditions.
 
 ---
 
-## 🔹 Version 5 – Geospatial Enhancements
+##  Version 5 – Geospatial Enhancements
 
 ### Features Added
 - Reference coordinates (REF_LAT, REF_LON)
@@ -128,7 +128,7 @@ Improved reliability under noisy telemetry conditions.
 Map functioning upgraded
 ---
 
-## 🔹 Version 6 – Derived Telemetry (Vertical Speed)
+##  Version 6 – Derived Telemetry (Vertical Speed)
 
 ### Implemented
 - ΔAltitude / ΔTime calculation
@@ -141,7 +141,7 @@ System became capable of telemetry processing, not just display.
 
 ---
 
-## 🔹 Version 7 – Mission Awareness & Status Panel
+##  Version 7 – Mission Awareness & Status Panel
 
 ### Added
 - Flight state mapping (`FLIGHT_STATE_MAP`)
@@ -158,7 +158,7 @@ Shifted from telemetry viewer → mission console.
 
 ---
 
-## 🔹 Version 8 – Performance Instrumentation
+##  Version 8 – Performance Instrumentation
 
 ### Introduced
 - Latency tracking system
@@ -175,7 +175,7 @@ Enabled runtime introspection and optimization.
 
 ---
 
-## 🔹 Version 9 – Adaptive CSV Logging
+##  Version 9 – Adaptive CSV Logging
 
 ### Enhancements
 - Persistent file handle
@@ -188,7 +188,7 @@ Robust data recording even when packet structure evolves.
 
 ---
 
-## 🔹 Version 10 – UI & Layout Refinement (Final)
+##  Version 10 – UI & Layout Refinement (Final)
 
 ### Improvements
 - Separated plots:
@@ -210,7 +210,7 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 
 ---
 
-# 🧠 Architectural Evolution Summary
+#  Architectural Evolution Summary
 
 | Phase | Capability Level |
 |--------|------------------|
@@ -227,7 +227,7 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 
 ---
 
-# 🏗 Current System Capabilities
+#  Current System Capabilities
 
 - Real-time serial telemetry ingestion
 - Configurable packet format (JSON-driven)
@@ -242,7 +242,7 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 
 ---
 
-# 📌 Conclusion
+#  Conclusion
 
 This project evolved from a basic telemetry display tool into a configurable, real-time, mission-aware ground station system with derived telemetry analytics and geospatial intelligence.
 
