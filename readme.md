@@ -217,7 +217,7 @@ Robust data recording even when packet structure evolves.
 
 ### Final Result
 A competition-ready, mission-aware CANSAT telemetry dashboard.
-
+![Dashboard Screenshot](images/WhatsApp%20Image%202026-03-04%20at%207.24.46%20AM.jpeg)
 ---
 ## Version 11 - Rolling out the basic application
 
