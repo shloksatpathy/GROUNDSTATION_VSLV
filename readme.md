@@ -36,7 +36,17 @@ Here how you start if you are a beginner (This part can be skipped):
     5) Now you are ready to make contributions 
 
 ---
+## Generating EXE file for the application 
+    1) Make sure pyisntaller works in the working directiory [pyinstaller --version]
 
+    2) make sure you have the logo for your application ready in an .ico format
+
+    3) command to generate the EXE file 
+        pyinstaller --onefile --windowed --icon=icon_filename.ico main.py
+
+    4) test the EXE file weather it runs the application or not from the dist folder as main.exe
+
+    
 ## Instructions for the users of the groundstation
 ---
      create a virtual environment
@@ -209,7 +219,15 @@ Robust data recording even when packet structure evolves.
 A competition-ready, mission-aware CANSAT telemetry dashboard.
 
 ---
+## Version 11 - Rolling out the basic application
 
+
+### Features
+- Basic application with an EXE file
+- plots the altitude 
+- applies kalman filter to the incoming altitude 
+
+---
 #  Architectural Evolution Summary
 
 | Phase | Capability Level |
