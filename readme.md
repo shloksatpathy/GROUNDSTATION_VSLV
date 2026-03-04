@@ -46,7 +46,7 @@ Here how you start if you are a beginner (This part can be skipped):
 
     4) test the EXE file weather it runs the application or not from the dist folder as main.exe
 
-    
+
 ## Instructions for the users of the groundstation
 ---
      create a virtual environment
@@ -227,6 +227,7 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 - plots the altitude 
 - applies kalman filter to the incoming altitude 
 
+![Dashboard Screenshot](images/Screenshot%202026-03-04%20071141.png)
 ---
 #  Architectural Evolution Summary
 
@@ -242,7 +243,7 @@ A competition-ready, mission-aware CANSAT telemetry dashboard.
 | V8 | Performance instrumentation |
 | V9 | Adaptive CSV logging |
 | V10 | Refined UI & system stability |
-
+| V11 | Application devlopment initiation |
 ---
 
 #  Current System Capabilities
