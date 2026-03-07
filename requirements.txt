@@ -1,0 +1,7 @@
+pandas 
+numpy 
+pyserial
+pyinstaller 
+folium
+pyqtgraph 
+pyqt5
