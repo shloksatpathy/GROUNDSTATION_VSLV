@@ -8,7 +8,7 @@ class PlotManager:
 
         pg.setConfigOption("background", "k")
         pg.setConfigOption("foreground", "w")
-
+        
         # --- Create plots ---
         self.plot_alt = pg.PlotWidget(title="Altitude (m)")
         self.plot_pres = pg.PlotWidget(title="Pressure (Pa)")

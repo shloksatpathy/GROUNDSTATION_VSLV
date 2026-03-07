@@ -1,20 +1,55 @@
 import sys
 from PyQt5 import QtWidgets
-from core.serial_manager import SerialManager
-from core.kalman_filter import AltitudeKalman
-from core.telemetry_processor import TelemetryProcessor
+
 from user_interface.dashboard import Dashboard
 
-app = QtWidgets.QApplication(sys.argv)
 
-serial_manager = SerialManager(9600)
-port = serial_manager.available_ports()
-print(port)
-serial_manager.connect('COM3') 
-kalman = AltitudeKalman()
-processor = TelemetryProcessor(kalman)
+def main():
+    app = QtWidgets.QApplication(sys.argv)
 
-window = Dashboard(serial_manager, processor)
-window.show()
+    app.setStyleSheet("""
+    QMainWindow {
+        background-color: #121212;
+    }
 
-sys.exit(app.exec_())
+    QWidget {
+        background-color: #121212;
+        color: #E0E0E0;
+        font-size: 13px;
+    }
+
+    QPushButton {
+        background-color: #1E1E1E;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 6px;
+    }
+
+    QPushButton:hover {
+        background-color: #333;
+    }
+
+    QComboBox {
+        background-color: #1E1E1E;
+        border: 1px solid #333;
+        padding: 4px;
+    }
+
+    QTableWidget {
+        background-color: #1E1E1E;
+        gridline-color: #444;
+    }
+
+    QHeaderView::section {
+        background-color: #2C2C2C;
+        padding: 4px;
+    }
+    """)    
+    window = Dashboard()
+    window.show()
+
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()
