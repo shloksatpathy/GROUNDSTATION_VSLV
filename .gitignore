@@ -7,7 +7,7 @@ Flight_2024ASI-ROCKETRY016.csv
 map.html
 finalised
 .vscode
-application/user_interface/__pycache__
-application/core/__pycache__
-application/__pycache__
-application/build
+application\user_interface\__pycache__
+application\core\__pycache__
+application\__pycache__
+GROUNDSTATION_VSLV\application\build
