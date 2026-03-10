@@ -1,7 +1,8 @@
 pandas 
-numpy 
-pyserial
-pyinstaller 
+PyQt5
+PyQtWebEngine
+pyserial 
+pyqtgraph
 folium
-pyqtgraph 
-pyqt5
+serial
+numpy
