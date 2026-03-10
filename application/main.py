@@ -1,20 +1,39 @@
 import sys
-from PyQt5 import QtWidgets
-from core.serial_manager import SerialManager
-from core.kalman_filter import AltitudeKalman
-from core.telemetry_processor import TelemetryProcessor
-from user_interface.dashboard import Dashboard
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget
+from ui.dashboard_tab import DashboardTab
+from ui.map_tab import MapTab
+from ui.packet_editor_tab import PacketEditorTab
 
-app = QtWidgets.QApplication(sys.argv)
 
-serial_manager = SerialManager(9600)
-port = serial_manager.available_ports()
-print(port)
-serial_manager.connect('COM3') 
-kalman = AltitudeKalman()
-processor = TelemetryProcessor(kalman)
+class GroundStation(QMainWindow):
 
-window = Dashboard(serial_manager, processor)
-window.show()
+    def __init__(self):
+        super().__init__()
 
-sys.exit(app.exec_())
+        self.setWindowTitle("VSSSIC Ground Station V3")
+        self.resize(1400, 900)
+
+        # Tabs
+        self.tabs = QTabWidget()
+
+        self.dashboard = DashboardTab()
+        self.map_tab = MapTab()
+        self.packet_editor = PacketEditorTab()
+
+        self.tabs.addTab(self.dashboard, "Telemetry Dashboard")
+        self.tabs.addTab(self.map_tab, "Map & Tracking")
+        self.tabs.addTab(self.packet_editor, "Packet Format")
+
+        self.setCentralWidget(self.tabs)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    # Dark theme
+    app.setStyle("Fusion")
+
+    window = GroundStation()
+    window.show()
+
+    sys.exit(app.exec_())
