@@ -1,12 +1,34 @@
-venv
-.venv
-./venv
+# Virtual environments
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts (PyInstaller)
+build/
+dist/
+*.spec
+
+# Telemetry output files
+*.csv
 telemetry.csv
-Flight_2024ASI-CANSAT0032.csv
-Flight_2024ASI-ROCKETRY016.csv
+
+# Map outputs
+*.html
 map.html
-finalised
-.vscode
-application/user_interface/__pychache__
-application/core/__pychache__
-application/__pychache__
+
+# IDE files
+.vscode/
+
+# Temporary folders
+finalised/
+
+# Logs
+*.log
+
+# Executables
+*.exe
