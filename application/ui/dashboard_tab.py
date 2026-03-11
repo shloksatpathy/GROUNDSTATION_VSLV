@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QLabel
 from ui.plots import PlotManager
-
+from core.serial_manager import SerialManager
 
 class DashboardTab(QWidget):
 
