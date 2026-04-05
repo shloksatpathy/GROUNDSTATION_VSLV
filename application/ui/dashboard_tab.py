@@ -7,7 +7,7 @@ class DashboardTab(QWidget):
     def __init__(self):
 
         super().__init__()
-
+        self.serial = SerialManager
         layout = QVBoxLayout()
 
         # ---- Serial Control Panel ----
@@ -46,7 +46,7 @@ class DashboardTab(QWidget):
         layout.addLayout(plots_layout)
 
         plots_layout2 = QHBoxLayout()
-
+        
         plots_layout2.addWidget(widgets["roll"])
         plots_layout2.addWidget(widgets["pitch"])
         plots_layout2.addWidget(widgets["yaw"])
@@ -55,4 +55,4 @@ class DashboardTab(QWidget):
 
         layout.addWidget(widgets["vspeed"])
 
-        self.setLayout(layout)
+        self.setLayout(layout)        
