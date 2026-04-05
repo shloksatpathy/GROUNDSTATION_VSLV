@@ -1,0 +1,13 @@
+{
+  "delimiter": ",",
+  "fields": [
+    "altitude",
+    "pressure",
+    "temperature",
+    "roll",
+    "pitch",
+    "yaw",
+    "lat",
+    "lon"
+  ]
+}
