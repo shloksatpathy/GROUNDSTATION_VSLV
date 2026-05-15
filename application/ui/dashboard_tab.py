@@ -84,7 +84,7 @@ class DashboardTab(QWidget):
 
         self.port_combo.clear()
 
-        ports = self.serial.get_available_ports()
+        ports = self.serial.available_ports()
 
         for p in ports:
             self.port_combo.addItem(p)
@@ -95,7 +95,7 @@ class DashboardTab(QWidget):
         baud = int(self.baud_combo.currentText())
 
         try:
-            self.serial.ser = self.serial.connect_serial(port, baud)
+            self.serial.connect(port, baud)
             print("Connected:", port)
         except Exception as e:
             print("Connection error:", e)

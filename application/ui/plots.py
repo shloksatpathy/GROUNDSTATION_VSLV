@@ -97,6 +97,9 @@ class PlotManager:
 
         t = data.get("time", [])
 
+        if not t:
+            return
+
         alt = data.get("altitude", [])
         pres = data.get("pressure", [])
         temp = data.get("temperature", [])
@@ -120,16 +123,20 @@ class PlotManager:
 
         vspeed = vspeed[-self.max_points:]
 
+        # Replace None with 0 to prevent pyqtgraph crash
+        def safe(lst):
+            return [v if v is not None else 0 for v in lst]
+
         # Update lines
-        self.cur_alt.setData(t, alt)
-        self.cur_pres.setData(t, pres)
-        self.cur_temp.setData(t, temp)
+        self.cur_alt.setData(t, safe(alt))
+        self.cur_pres.setData(t, safe(pres))
+        self.cur_temp.setData(t, safe(temp))
 
-        self.cur_roll.setData(t, roll)
-        self.cur_pitch.setData(t, pitch)
-        self.cur_yaw.setData(t, yaw)
+        self.cur_roll.setData(t, safe(roll))
+        self.cur_pitch.setData(t, safe(pitch))
+        self.cur_yaw.setData(t, safe(yaw))
 
-        self.cur_vspeed.setData(t, vspeed)
+        self.cur_vspeed.setData(t, safe(vspeed))
 
     # -------------------------------
     # Clear Plots

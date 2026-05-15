@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.packet_editor_tab import PacketEditorTab
-from core.data_buffer import add_packet
 from core.serial_manager import SerialManager
 from core.packet_parser import PacketParser
 

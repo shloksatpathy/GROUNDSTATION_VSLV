@@ -1,10 +1,16 @@
 import json
 import re
+import os
 
 
 class PacketParser:
 
     def __init__(self, format_file="packet_format.json"):
+
+        # Resolve path relative to this module's directory
+        if not os.path.isabs(format_file):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            format_file = os.path.join(base_dir, format_file)
 
         self.format_file = format_file
         self.delimiter = ","
