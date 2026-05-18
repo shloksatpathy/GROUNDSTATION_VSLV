@@ -1,0 +1,19 @@
+{
+  "team_id": "2024ASI-CANSAT0032",
+  "baud_rate": 9600,
+  "window_sec": 10,
+  "vspeed_smooth_window": 3,
+
+  "ref_lat": 26.712196,
+  "ref_lon": 84.305725,
+  "volt_divisor": 7.0,
+
+  "flight_state_map": {
+    "0": "idle",
+    "1": "ascent",
+    "2": "descent"
+  },
+
+  "csv_path": "Flight_2024ASI-CANSAT0032.csv",
+  "packet_format_path": "packet_format.json"
+}
