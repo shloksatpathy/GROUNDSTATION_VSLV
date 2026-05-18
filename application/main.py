@@ -34,6 +34,8 @@ if __name__ == "__main__":
 
     # Dark theme
     app.setStyle("Fusion")
+    
+    # Custom dark palette can be added here if desired
 
     window = GroundStation()
     window.show()
