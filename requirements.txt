@@ -4,5 +4,4 @@ PyQtWebEngine
 pyserial 
 pyqtgraph
 folium
-serial
 numpy
