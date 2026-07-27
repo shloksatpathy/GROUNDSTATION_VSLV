@@ -10,7 +10,8 @@ import os
 
 _config_cache = None
 _CONFIG_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "config",
     "config.json"
 )
 
@@ -28,8 +29,8 @@ _DEFAULTS = {
         "1": "ascent",
         "2": "descent"
     },
-    "csv_path": "Flight_2024ASI-CANSAT0032.csv",
-    "packet_format_path": "packet_format.json"
+    "csv_path": "data/Flight_2024ASI-CANSAT0032.csv",
+    "packet_format_path": "config/packet_format.json"
 }
 
 

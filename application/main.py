@@ -16,7 +16,16 @@ class GroundStation(QMainWindow):
 
         self.setWindowTitle("VSSSIC Ground Station V3")
         self.resize(1500, 950)
-        self.setWindowIcon(QIcon("images/vsssic-logo-1.ico"))
+
+        # Load icon from project root
+        import os
+        icon_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "images",
+            "vsssic-logo-1.ico"
+        )
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
         # Shared Core Instances
         self.serial = SerialManager()

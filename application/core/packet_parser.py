@@ -26,10 +26,10 @@ class PacketParser:
             cfg = load_config()
             format_file = cfg.get("packet_format_path", "packet_format.json")
 
-        # Resolve path relative to this module's directory
+        # Resolve path relative to project root (two levels up from this module)
         if not os.path.isabs(format_file):
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            format_file = os.path.join(base_dir, format_file)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            format_file = os.path.join(project_root, format_file)
 
         self.format_file = format_file
         self.delimiter = ","

@@ -13,10 +13,10 @@ class PacketEditorTab(QWidget):
         self.parser = parser
         
         cfg = load_config()
-        self.format_file = cfg.get("packet_format_path", "packet_format.json")
+        self.format_file = cfg.get("packet_format_path", "config/packet_format.json")
         if not os.path.isabs(self.format_file):
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self.format_file = os.path.join(base_dir, self.format_file)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.format_file = os.path.join(project_root, self.format_file)
             
         layout = QVBoxLayout()
         

@@ -13,9 +13,9 @@ import serial.tools.list_ports
 import numpy as np 
 
 # ---------------- Config ----------------
-CSV_PATH = "Flight_2024ASI-CANSAT0032.csv"
+CSV_PATH = "Flight_2026ASI-CANSAT0064.csv"
 PACKET_FORMAT_PATH = "packet_format.json"  # editable JSON describing incoming packet
-TEAM_ID = "2024ASI-CANSAT0032"
+TEAM_ID = "2026ASI-CANSAT0064"
 BAUD_RATE = 9600
 WINDOW_SEC = 10   # sliding window size (seconds)
 
@@ -218,16 +218,16 @@ class altitudeKalmanFilter:
 
         #predict
         self.x = F @ self.x
-        self.p = F @ self.P @ F.T + self.Q_base
+        self.p = F @ self.p @ F.T + self.Q_base
 
         #update 
         z = np.array([[measured_altitude]])
         y = z - (self.H @ self.x)
-        S = self.H @ self.P @ self.H.T + self.R
-        K = self.P @ self.H.T @ np.linalg.inv(S)
+        S = self.H @ self.p @ self.H.T + self.R
+        K = self.p @ self.H.T @ np.linalg.inv(S)
 
         self.x = self.x + K @ y
-        self.P = (np.eye(2) - K @ self.H) @ self.P
+        self.p = (np.eye(2) - K @ self.H) @ self.p
 
         return self.x[0, 0], self.x[1, 0]
 # ---------------- Haversine distance ----------------
@@ -948,7 +948,7 @@ class Groundstation(QtWidgets.QMainWindow):
                     if any(a is not None for a in alt_vals):
                         x_a = [times_w[i] for i, a in enumerate(alt_vals) if a is not None]
                         y_a = [a for a in alt_vals if a is not None]
-                        self.cur_alt.setData(times_w, filtered_altitudes)
+                        self.cur_alt.setData(x_a, y_a)
                     else:
                         self.cur_alt.clear()
 
@@ -1044,6 +1044,25 @@ class Groundstation(QtWidgets.QMainWindow):
 
                     filtered_altitudes.append(filtered_alt)
                     filtered_velocities.append(filtered_vel)
+
+            # --- Filtered altitude / vertical speed plot updates ---
+            try:
+                if any(v is not None for v in filtered_altitudes):
+                    x_f = [times_w[i] for i, v in enumerate(filtered_altitudes) if v is not None]
+                    y_f = [v for v in filtered_altitudes if v is not None]
+                    self.cur_alt.setData(x_f, y_f)
+                else:
+                    self.cur_alt.clear()
+
+                if any(v is not None for v in filtered_velocities):
+                    x_vs = [times_w[i] for i, v in enumerate(filtered_velocities) if v is not None]
+                    y_vs = [v for v in filtered_velocities if v is not None]
+                    self.cur_vspeed.setData(x_vs, y_vs)
+                else:
+                    self.cur_vspeed.clear()
+            except Exception as e:
+                print("filtered alt/vspeed plot error:", e)
+
             # --- Roll / Pitch / Yaw plot updates (separate plots; auto-range) ---
             try:
                 roll = []
