@@ -12,6 +12,8 @@ __pycache__/
 build/
 dist/
 *.spec
+# But allow build.spec for reproducible builds
+!build.spec
 
 # Telemetry output files
 *.csv
