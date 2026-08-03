@@ -13,12 +13,14 @@ from core.telemetry_processor import TelemetryProcessor
 
 class DashboardTab(QWidget):
 
-    def __init__(self, serial_manager: SerialManager, map_tab: MapTab):
+    def __init__(self, serial_manager: SerialManager, map_tab: MapTab,
+                 parser: PacketParser = None):
         super().__init__()
 
         # ----- Core Systems -----
         self.serial = serial_manager
-        self.parser = PacketParser()
+        # Shared with PacketEditorTab so schema edits apply to the live pipeline
+        self.parser = parser if parser is not None else PacketParser()
         self.buffer = TelemetryBuffer()
         self.recorder = DataRecorder()
         self.processor = TelemetryProcessor()
@@ -27,6 +29,8 @@ class DashboardTab(QWidget):
         # Connect threaded serial signal
         self.serial.line_received.connect(self.on_serial_line)
         self.packet_count = 0
+        # Full enriched packet — the buffer only keeps the plotted subset of keys
+        self.latest_packet = None
 
         layout = QVBoxLayout()
 
@@ -183,11 +187,19 @@ class DashboardTab(QWidget):
         self.buffer.clear()
         self.packet_count = 0
         self.table.setRowCount(0)
-        self.recorder.start()
+        try:
+            self.recorder.start()
+        except Exception as e:
+            print(f"[RECORDER] Could not start recording: {e}")
 
     def stop_recording(self):
         self.recorder.stop()
-        
+
+    def shutdown(self):
+        """Flush and release the CSV handle on application exit."""
+        self.recorder.close()
+
+
     def send_command(self):
         cmd = self.cmd_edit.text() or ""
         if not cmd:
@@ -213,7 +225,8 @@ class DashboardTab(QWidget):
                 # Enqueue data processing and update logic
                 # (1) Apply Kalman Filter, battery %, state parsing
                 enriched = self.processor.process(packet)
-                
+                self.latest_packet = enriched
+
                 # (2) Store in buffer for plotting
                 self.buffer.add_packet(enriched)
                 
@@ -229,7 +242,7 @@ class DashboardTab(QWidget):
                     if lat_key and lon_key:
                         lat, lon = enriched.get(lat_key), enriched.get(lon_key)
                         if lat is not None and lon is not None:
-                            self.map_tab.update(float(lat), float(lon))
+                            self.map_tab.update_position(float(lat), float(lon))
                 
                 # (5) Update data table dynamically
                 new_cols = [k for k in enriched.keys() if k not in self.table_columns]
@@ -259,22 +272,27 @@ class DashboardTab(QWidget):
             self.plots.update(self.buffer.get_data())
             
             # 2. Update Info Panel Labels
-            latest = self.buffer.latest()
+            latest = self.latest_packet
             if latest:
-                t = next((latest.get(k) for k in ["TIME_SINCE_S", "time", "TIME"] if k in latest), "—")
+                t = next(
+                    (latest[k] for k in ["TIME_SINCE_S", "time", "TIME"]
+                     if latest.get(k) is not None),
+                    None
+                )
                 if isinstance(t, (int, float)):
                     self.info_lbl_time.setText(f"Time since power: {t:.2f} s")
                 else:
-                    self.info_lbl_time.setText(f"Time since power: {t} s")
-                
-                state = latest.get("flight_state_str", "—")
+                    self.info_lbl_time.setText(f"Time since power: {t if t else '—'} s")
+
+                state = latest.get("flight_state_str") or "—"
                 self.info_lbl_state.setText(f"State: {state}")
-                
+
                 pwr = latest.get("power_pct")
                 if pwr is not None:
                     self.info_lbl_power.setText(f"Power: {pwr:.1f} %")
-                
+
                 self.info_lbl_pkt.setText(f"Packets: {self.packet_count}")
-                
+
+
         except Exception as e:
             print("GUI update error:", e)

@@ -15,7 +15,7 @@ import threading
 
 import pandas as pd
 
-from core.config import load_config
+from core.config import load_config, resolve_path
 
 
 class DataRecorder:
@@ -24,9 +24,9 @@ class DataRecorder:
 
         if csv_path is None:
             cfg = load_config()
-            csv_path = cfg.get("csv_path", "Flight_2024ASI-CANSAT0032.csv")
+            csv_path = cfg.get("csv_path", "data/Flight_2024ASI-CANSAT0032.csv")
 
-        self.csv_path = csv_path
+        self.csv_path = resolve_path(csv_path)
         self.columns = list(initial_columns) if initial_columns else ["TIMESTAMP"]
         self.recording = False
         self.packet_count = 0
@@ -42,6 +42,18 @@ class DataRecorder:
     def start(self):
         """Open CSV file handle and begin recording."""
         with self._lock:
+            # Close any handle left over from a previous session
+            if self._csv_fh:
+                try:
+                    self._csv_fh.close()
+                except Exception:
+                    pass
+                self._csv_fh = None
+
+            parent = os.path.dirname(self.csv_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+
             self._csv_has_header = (
                 os.path.exists(self.csv_path) and
                 os.path.getsize(self.csv_path) > 0
@@ -87,7 +99,8 @@ class DataRecorder:
             if not self._csv_fh or not self._csv_writer:
                 return
 
-            # Add timestamp
+            # Add timestamp to a copy — the caller's packet is also used by the UI
+            packet = dict(packet)
             packet.setdefault(
                 "TIMESTAMP",
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]

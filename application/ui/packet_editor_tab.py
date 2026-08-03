@@ -1,9 +1,7 @@
 import json
-import os
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
                              QPushButton, QMessageBox, QLabel)
 
-from core.config import load_config
 from core.packet_parser import PacketParser
 
 class PacketEditorTab(QWidget):
@@ -11,13 +9,10 @@ class PacketEditorTab(QWidget):
     def __init__(self, parser: PacketParser):
         super().__init__()
         self.parser = parser
-        
-        cfg = load_config()
-        self.format_file = cfg.get("packet_format_path", "config/packet_format.json")
-        if not os.path.isabs(self.format_file):
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            self.format_file = os.path.join(project_root, self.format_file)
-            
+
+        # Edit exactly the file the live parser reads, so "Save & Apply" takes effect
+        self.format_file = parser.format_file
+
         layout = QVBoxLayout()
         
         # Info label
@@ -51,22 +46,28 @@ class PacketEditorTab(QWidget):
         self.setLayout(layout)
         
         # Connect signals
-        self.load_button.clicked.connect(self.load_format)
+        # lambda guard: clicked() passes a `checked` bool that would land on show_errors
+        self.load_button.clicked.connect(lambda: self.load_format())
         self.add_field_button.clicked.connect(self.add_field)
         self.save_button.clicked.connect(self.save_format)
         
-        # Initial load
-        self.load_format()
-        
-    def load_format(self):
+        # Initial load — silent, a modal dialog here would block the window from showing
+        self.load_format(show_errors=False)
+
+    def load_format(self, show_errors=True):
         """Load JSON file content into the editor."""
         try:
             with open(self.format_file, "r") as f:
                 content = f.read()
             self.editor.setText(content)
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not load format file: {e}")
-            
+            msg = f"Could not load format file: {e}"
+            print(f"[EDITOR] {msg}")
+            self.editor.setText("")
+            if show_errors:
+                QMessageBox.warning(self, "Error", msg)
+
+
     def add_field(self):
         """Insert a template field at cursor position."""
         template = '    {\n      "name": "NEW_FIELD",\n      "type": "float"\n    }'

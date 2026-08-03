@@ -22,13 +22,18 @@ class TelemetryBuffer:
 
         self.last_alt = None
         self.last_time = None
+        self.t0 = None
 
     # -----------------------------------
     # Add telemetry packet
     # -----------------------------------
     def add_packet(self, packet):
 
-        t = time.time()
+        # Seconds since the first packet — epoch values make the plot x-axis unreadable
+        now = time.time()
+        if self.t0 is None:
+            self.t0 = now
+        t = now - self.t0
 
         alt = packet.get("altitude")
         pres = packet.get("pressure")
@@ -125,3 +130,4 @@ class TelemetryBuffer:
 
         self.last_alt = None
         self.last_time = None
+        self.t0 = None

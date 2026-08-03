@@ -12,16 +12,23 @@ setup(
     version="3.0.0",
     description="Modular Ground Station Application for VSSSIC",
     author="VSSSIC Team",
-    packages=find_packages(),
+    # The modules use flat imports (`from core.config import ...`), so
+    # application/ is the package root rather than a package itself.
+    package_dir={"": "application"},
+    packages=find_packages(where="application"),
+    py_modules=["main"],
     install_requires=requirements,
     entry_points={
-        'console_scripts': [
-            'ground-station=application.main:main',
+        'gui_scripts': [
+            'ground-station=main:main',
         ],
     },
     include_package_data=True,
-    package_data={
-        '': ['images/vsssic-logo-1.ico'],
-    },
+    data_files=[
+        ('share/vsssic-ground-station/config',
+         ['config/config.json', 'config/packet_format.json']),
+        ('share/vsssic-ground-station/images',
+         ['images/vsssic-logo-1.ico']),
+    ],
     python_requires='>=3.8',
 )

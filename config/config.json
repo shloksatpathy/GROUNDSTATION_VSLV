@@ -14,6 +14,6 @@
     "2": "descent"
   },
 
-  "csv_path": "Flight_2024ASI-CANSAT0032.csv",
-  "packet_format_path": "packet_format.json"
+  "csv_path": "data/Flight_2024ASI-CANSAT0032.csv",
+  "packet_format_path": "config/packet_format.json"
 }

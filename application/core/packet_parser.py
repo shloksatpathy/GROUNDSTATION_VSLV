@@ -10,9 +10,8 @@ device timestamp detection, and extra-field handling.
 
 import json
 import re
-import os
 
-from core.config import load_config
+from core.config import load_config, resolve_path
 
 
 class PacketParser:
@@ -24,14 +23,9 @@ class PacketParser:
 
         if format_file is None:
             cfg = load_config()
-            format_file = cfg.get("packet_format_path", "packet_format.json")
+            format_file = cfg.get("packet_format_path", "config/packet_format.json")
 
-        # Resolve path relative to project root (two levels up from this module)
-        if not os.path.isabs(format_file):
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            format_file = os.path.join(project_root, format_file)
-
-        self.format_file = format_file
+        self.format_file = resolve_path(format_file)
         self.delimiter = ","
         self.fields = []          # list of {"name": str, "type": str}
         self.field_names = []     # convenience: just the name strings

@@ -23,9 +23,12 @@ echo.
 echo ========================================
 echo Build Complete!
 echo ========================================
-echo Executable location: .\dist\VSSSIC_Ground_Station\VSSSIC_Ground_Station.exe
+echo Executable location: .\dist\VSSSIC_Ground_Station.exe
 echo.
 echo To run the application:
-echo   .\dist\VSSSIC_Ground_Station\VSSSIC_Ground_Station.exe
+echo   .\dist\VSSSIC_Ground_Station.exe
+echo.
+echo On first launch it creates config\ and data\ alongside the executable.
+echo Edit dist\config\config.json to change team ID, baud rate, or map origin.
 echo.
 pause

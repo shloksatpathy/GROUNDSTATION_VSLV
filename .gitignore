@@ -15,6 +15,9 @@ dist/
 # But allow build.spec for reproducible builds
 !build.spec
 
+# setuptools metadata
+*.egg-info/
+
 # Telemetry output files
 *.csv
 telemetry.csv

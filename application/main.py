@@ -1,4 +1,5 @@
 import sys
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget
 from PyQt5.QtGui import QIcon, QPalette, QColor
 
@@ -36,7 +37,7 @@ class GroundStation(QMainWindow):
 
         # Map tab is passed to Dashboard to allow it to push GNSS updates
         self.map_tab = MapTab()
-        self.dashboard = DashboardTab(self.serial, self.map_tab)
+        self.dashboard = DashboardTab(self.serial, self.map_tab, self.parser)
         self.packet_editor = PacketEditorTab(self.parser)
 
         self.tabs.addTab(self.dashboard, "Telemetry Dashboard")
@@ -49,10 +50,11 @@ class GroundStation(QMainWindow):
         """Clean shutdown of threads and file handles before exit."""
         print("[SHUTDOWN] Closing connections and file handles...")
         try:
-            self.dashboard.stop_recording()
+            self.dashboard.shutdown()
         except Exception as e:
             print(f"[SHUTDOWN] Error stopping recording: {e}")
-            
+
+
         try:
             self.serial.disconnect()
         except Exception as e:
@@ -62,12 +64,11 @@ class GroundStation(QMainWindow):
         print("[SHUTDOWN] Complete.")
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    # Use a consistent cross-platform dark-friendly style
+def apply_dark_theme(app):
+    """Apply the Fusion style + dark palette. Must run for any entry point —
+    the widget stylesheets assume a dark background."""
     app.setStyle("Fusion")
-    
+
     # Custom dark palette
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor(18, 18, 18))
@@ -93,7 +94,18 @@ if __name__ == "__main__":
         QHeaderView::section { background-color: #2C2C2C; color: #E0E0E0; padding: 4px; border: none; }
     """)
 
+
+def main():
+    """Console/GUI entry point. Kept in sync with run.py."""
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    app = QApplication(sys.argv)
+    apply_dark_theme(app)
+
     window = GroundStation()
     window.show()
 
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()

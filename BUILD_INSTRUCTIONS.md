@@ -49,19 +49,31 @@ pyinstaller build.spec
 
 #### Linux/Mac
 ```bash
-./dist/VSSSIC_Ground_Station/VSSSIC_Ground_Station
+./dist/VSSSIC_Ground_Station
 ```
 
 #### Windows
 ```bash
-.\dist\VSSSIC_Ground_Station\VSSSIC_Ground_Station.exe
+.\dist\VSSSIC_Ground_Station.exe
 ```
 
 ## Build Output
-The build process creates:
-- **dist/VSSSIC_Ground_Station/** - Complete application bundle with all dependencies
+The build is **single-file**: everything is packed into one executable.
+- **dist/VSSSIC_Ground_Station** (`.exe` on Windows) - the standalone application
 - **build/** - Build artifacts (intermediate files)
-- **VSSSIC_Ground_Station.spec** - PyInstaller specification (auto-generated if modified)
+- **build.spec** - PyInstaller specification (edit this, not a generated spec)
+
+## Runtime Files
+On first launch the executable creates two directories next to itself:
+- **config/** - seeded from the bundled defaults. Edit `config/config.json` to
+  change team ID, baud rate, map origin, or the voltage divider; edit
+  `config/packet_format.json` (or use the in-app Packet Format Editor) to
+  change the telemetry schema.
+- **data/** - recorded flight CSVs.
+
+These live beside the executable rather than inside it. A single-file build
+unpacks to a temporary directory that is deleted on exit, so anything written
+there would be lost when the application closes.
 
 ## Application Features
 - **Telemetry Dashboard** - Real-time telemetry data visualization
@@ -103,7 +115,10 @@ python3 run.py
 ```
 
 ## Distribution
-After building, distribute the `dist/VSSSIC_Ground_Station` folder to end users. They don't need Python or dependencies installed - the application is completely standalone.
+After building, distribute the single `dist/VSSSIC_Ground_Station` executable to
+end users. They don't need Python or dependencies installed - the application is
+completely standalone. Tell them to place it in a writable directory, since it
+creates `config/` and `data/` alongside itself on first run.
 
 ## Additional Resources
 - **PyInstaller Documentation**: https://pyinstaller.org/

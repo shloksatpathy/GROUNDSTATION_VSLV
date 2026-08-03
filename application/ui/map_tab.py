@@ -82,8 +82,11 @@ class MapTab(QWidget):
         self.update_map(self.ref_lat, self.ref_lon)
         self.update_ref_map(None, None)
 
-    def update(self, lat, lon):
-        """Called by dashboard when new coordinates arrive."""
+    def update_position(self, lat, lon):
+        """Called by dashboard when new coordinates arrive.
+
+        Deliberately not named update() — that would shadow QWidget.update().
+        """
         self.update_map(lat, lon)
         self.update_ref_map(lat, lon)
 
