@@ -16,8 +16,10 @@ GROUNDSTATION_VSLV/
 │   │   ├── serial_manager.py # Serial communication
 │   │   └── telemetry_processor.py # Data processing pipeline
 │   └── ui/                  # PyQt5 UI components
+│       ├── attitude_3d.py   # 3D orientation view (roll/pitch/yaw)
 │       ├── dashboard_tab.py # Main telemetry dashboard
 │       ├── map_tab.py       # Map & tracking UI
+│       ├── mesh_loader.py   # STL/OBJ model loading for the 3D view
 │       ├── packet_editor_tab.py # Packet format editor
 │       └── plots.py         # Plotting utilities
 │
@@ -31,6 +33,10 @@ GROUNDSTATION_VSLV/
 ├── images/                  # UI assets and images
 │   ├── vsssic-logo-1.ico   # Application icon
 │   └── *.png, *.jpeg       # Screenshots and graphics
+│
+├── models/                  # Vehicle CAD models for the 3D attitude view
+│   ├── vehicle.stl          # Your model (STL binary/ASCII, or .obj)
+│   └── README.md            # Axis convention and export instructions
 │
 ├── legacy/                  # Archived/deprecated scripts
 │   ├── GS_cansat.py        # Original monolithic ground station

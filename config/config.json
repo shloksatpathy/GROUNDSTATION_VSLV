@@ -15,5 +15,11 @@
   },
 
   "csv_path": "data/Flight_2024ASI-CANSAT0032.csv",
-  "packet_format_path": "config/packet_format.json"
+  "packet_format_path": "config/packet_format.json",
+
+  "attitude_model_path": "models/vehicle.stl",
+  "attitude_model_size": 2.4,
+  "attitude_model_scale": null,
+  "attitude_model_rotation": null,
+  "attitude_invert": [false, false, false]
 }

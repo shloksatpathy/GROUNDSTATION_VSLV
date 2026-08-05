@@ -1,10 +1,11 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                               QComboBox, QLabel, QLineEdit, QTableWidget, 
-                               QTableWidgetItem)
+                               QComboBox, QLabel, QLineEdit, QSizePolicy,
+                               QTableWidget, QTableWidgetItem)
 from PyQt5.QtCore import QTimer
 
 from ui.plots import PlotManager
 from ui.map_tab import MapTab
+from ui.attitude_3d import Attitude3DView
 from core.serial_manager import SerialManager
 from core.packet_parser import PacketParser
 from core.data_buffer import TelemetryBuffer
@@ -118,24 +119,38 @@ class DashboardTab(QWidget):
         
         middle_layout.addLayout(plots_vbox, stretch=4)
         
+        # Right Column: Info Panel + 3D Attitude View
+        side_layout = QVBoxLayout()
+        side_layout.setContentsMargins(0, 0, 0, 0)
+
         # Info Panel
         info_layout = QVBoxLayout()
         info_widget = QWidget()
         info_widget.setLayout(info_layout)
         info_widget.setStyleSheet("background:#1A1A1A; border:1px solid #333; border-radius:6px; padding:10px;")
-        
+
         self.info_lbl_time = QLabel("Time since power: — s")
         self.info_lbl_state = QLabel("State: idle")
         self.info_lbl_power = QLabel("Power: — %")
         self.info_lbl_pkt = QLabel("Packets: 0")
-        
+
         for lbl in (self.info_lbl_time, self.info_lbl_state, self.info_lbl_power, self.info_lbl_pkt):
             lbl.setStyleSheet("color:#E0E0E0; font-size:15px; font-weight: bold; margin-bottom: 8px;")
             info_layout.addWidget(lbl)
-            
-        info_layout.addStretch()
-        middle_layout.addWidget(info_widget, stretch=1)
-        
+
+        # Hug the labels so the spare height goes to the 3D view below
+        info_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        side_layout.addWidget(info_widget)
+
+        # 3D orientation from roll/pitch/yaw — takes the remaining height
+        self.attitude_view = Attitude3DView()
+        side_layout.addWidget(self.attitude_view, stretch=1)
+
+        side_widget = QWidget()
+        side_widget.setLayout(side_layout)
+        side_widget.setMinimumWidth(320)
+        middle_layout.addWidget(side_widget, stretch=1)
+
         layout.addLayout(middle_layout)
 
         # ---- Bottom: Data Table ----
@@ -187,6 +202,7 @@ class DashboardTab(QWidget):
         self.buffer.clear()
         self.packet_count = 0
         self.table.setRowCount(0)
+        self.attitude_view.reset()
         try:
             self.recorder.start()
         except Exception as e:
@@ -293,6 +309,30 @@ class DashboardTab(QWidget):
 
                 self.info_lbl_pkt.setText(f"Packets: {self.packet_count}")
 
+                # 3. Update 3D Attitude View
+                self.attitude_view.set_attitude(
+                    self._attitude_value(latest, self.ROLL_KEYS),
+                    self._attitude_value(latest, self.PITCH_KEYS),
+                    self._attitude_value(latest, self.YAW_KEYS),
+                )
 
         except Exception as e:
             print("GUI update error:", e)
+
+    # Attitude field names vary with the packet schema, so probe the usual ones.
+    ROLL_KEYS = ["roll", "ROLL", "ROLL_DEG", "Roll"]
+    PITCH_KEYS = ["pitch", "PITCH", "PITCH_DEG", "Pitch"]
+    YAW_KEYS = ["yaw", "YAW", "YAW_DEG", "Yaw", "heading", "HEADING"]
+
+    @staticmethod
+    def _attitude_value(packet, candidate_keys):
+        """First numeric value found under any candidate key, else None."""
+        for key in candidate_keys:
+            v = packet.get(key)
+            if v is None or v == "":
+                continue
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+        return None

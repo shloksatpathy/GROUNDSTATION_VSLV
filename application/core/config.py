@@ -92,7 +92,21 @@ _DEFAULTS = {
         "2": "descent"
     },
     "csv_path": "data/Flight_2024ASI-CANSAT0032.csv",
-    "packet_format_path": "config/packet_format.json"
+    "packet_format_path": "config/packet_format.json",
+
+    # --- 3D attitude view ---
+    # Path to the vehicle CAD model (.stl binary/ASCII, or .obj). If the file
+    # is missing, the view falls back to a generic placeholder vehicle.
+    "attitude_model_path": "models/vehicle.stl",
+    # Longest model dimension, in view units, after auto-fit.
+    "attitude_model_size": 2.4,
+    # Explicit scale multiplier — overrides auto-fit when set.
+    "attitude_model_scale": None,
+    # One-time [rx, ry, rz] degrees to align the CAD file's axes with the
+    # body frame the view expects: +X nose/forward, +Y left, +Z up.
+    "attitude_model_rotation": None,
+    # Flip the sign of [roll, pitch, yaw] for IMUs of the opposite handedness.
+    "attitude_invert": [False, False, False]
 }
 
 

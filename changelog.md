@@ -195,6 +195,26 @@ Versions represent architectural evolution stages.
 
 ---
 
+## [v2.0.2] - 3D attitude view on the dashboard
+### Added
+- 3D orientation panel below the dashboard info panel, driven by the live
+  roll/pitch/yaw telemetry (`application/ui/attitude_3d.py`)
+- Fixed reference triad (X=North, Y=West, Z=Up) plus a body triad attached to
+  the vehicle, orbit/zoom with the mouse, "Reset View" to recentre
+- Dependency-free STL (binary + ASCII) and OBJ loader
+  (`application/ui/mesh_loader.py`) — drop the CAD model at `models/vehicle.stl`
+- `attitude_*` keys in `config/config.json` for model path, scale, CAD-axis
+  alignment and per-axis sign inversion
+- Placeholder vehicle model shown until a CAD file is supplied
+
+### Impact
+- Vehicle orientation is readable at a glance instead of being inferred from
+  three separate angle plots
+- Falls back to a numeric-only readout if OpenGL is unavailable, so a driver
+  problem on the field laptop cannot take down the dashboard
+
+---
+
 # 🚀 Upcoming (Planned)
 
 ## [v2.1.0] – Architecture Refactor

@@ -14,6 +14,7 @@ a = Analysis(
     datas=[
         ('images/vsssic-logo-1.ico', 'images'),
         ('config', 'config'),
+        ('models', 'models'),
     ],
     hiddenimports=[
         'PyQt5.QtCore',
@@ -21,6 +22,8 @@ a = Analysis(
         'PyQt5.QtWidgets',
         'PyQt5.QtWebEngineWidgets',
         'pyqtgraph',
+        'pyqtgraph.opengl',
+        'OpenGL',
         'folium',
         'serial',
         'serial.tools.list_ports',
