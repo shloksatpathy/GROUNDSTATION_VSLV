@@ -182,21 +182,30 @@ Versions represent architectural evolution stages.
 
 
 
-## [v2.0.1] - Additon of kalman filter for the altitude and the vertical speed plots estimation
-### added 
-- Kalman filter for the estimation of the vertical speed and altitude 
+## [v2.1.0] – Modular Architecture, Kalman Filtering & 3D Attitude
 
+The monolithic console from v2.0.0 was broken apart into discrete modules, the
+altitude/vertical-speed estimation moved onto a Kalman filter, a 3D attitude
+view was added, and the whole thing is now shipped as a standalone executable.
 
-### Impact
-- No big spikes in the altitude plot 
-- smooth curve for the vertical speed plot with minimised noise 
+### Added — Architecture
+- `application/core/` split into single-responsibility modules:
+  - `serial_manager.py` – port discovery, connection lifecycle, threaded reads
+  - `packet_parser.py` – schema-driven parsing from `config/packet_format.json`
+  - `telemetry_processor.py` – derived telemetry and filtering pipeline
+  - `data_buffer.py` – in-memory rolling buffers for plotting
+  - `data_recorder.py` – adaptive CSV logging into `data/`
+  - `config.py` – configuration loading with defaults
+- `application/ui/` split into `dashboard_tab.py`, `map_tab.py`,
+  `packet_editor_tab.py` and `plots.py`
+- In-app Packet Format Editor for changing the telemetry schema without
+  restarting or hand-editing JSON
+- Legacy monolithic scripts archived under `legacy/` for reference
 
+### Added — Telemetry
+- Kalman filter driving the altitude and vertical-speed estimates
 
-
----
-
-## [v2.0.2] - 3D attitude view on the dashboard
-### Added
+### Added — 3D Attitude View
 - 3D orientation panel below the dashboard info panel, driven by the live
   roll/pitch/yaw telemetry (`application/ui/attitude_3d.py`)
 - Fixed reference triad (X=North, Y=West, Z=Up) plus a body triad attached to
@@ -207,28 +216,32 @@ Versions represent architectural evolution stages.
   alignment and per-axis sign inversion
 - Placeholder vehicle model shown until a CAD file is supplied
 
+### Added — Packaging
+- PyInstaller single-file build (`build.spec`, `build.sh`, `build.bat`)
+  producing `VSSSIC_Ground_Station[.exe]` with the VSVL icon embedded
+- On first launch the executable seeds an editable `config/` and a `data/`
+  directory beside itself, so settings and flight logs survive restarts
+- `BUILD_INSTRUCTIONS.md` and `STRUCTURE.md` documenting the build and layout
+
+### Changed
+- Configuration and packet schema moved to a top-level `config/` directory
+- Entry point is now `run.py` at the project root
+
 ### Impact
+- Modules can be tested and changed in isolation instead of editing one file
+- No large spikes in the altitude plot; vertical speed reads as a smooth curve
+  with noise suppressed
 - Vehicle orientation is readable at a glance instead of being inferred from
   three separate angle plots
-- Falls back to a numeric-only readout if OpenGL is unavailable, so a driver
-  problem on the field laptop cannot take down the dashboard
+- The 3D view falls back to a numeric-only readout if OpenGL is unavailable, so
+  a driver problem on the field laptop cannot take down the dashboard
+- Operators no longer need Python or dependencies installed to run the station
 
 ---
 
 # 🚀 Upcoming (Planned)
 
-## [v2.1.0] – Architecture Refactor
-- Separate modules:
-  - SerialManager
-  - PacketParser
-  - TelemetryProcessor
-  - PlotManager
-  - MapManager
-  - DataRecorder
-- Threaded serial reading
-
 ## [v2.2.0] – Advanced Telemetry
-- Kalman filtering
 - Anomaly detection
 - Telemetry replay mode
 

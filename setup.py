@@ -9,7 +9,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="VSSSIC-Ground-Station",
-    version="3.0.0",
+    version="2.1.0",
     description="Modular Ground Station Application for VSSSIC",
     author="VSSSIC Team",
     # The modules use flat imports (`from core.config import ...`), so
