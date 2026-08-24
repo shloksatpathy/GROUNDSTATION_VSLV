@@ -11,6 +11,7 @@ import shutil
 import sys
 
 _config_cache = None
+_rocket_config_cache = None
 
 _FROZEN = getattr(sys, "frozen", False)
 
@@ -85,6 +86,7 @@ _DEFAULTS = {
     "vspeed_smooth_window": 3,
     "ref_lat": 26.712196,
     "ref_lon": 84.305725,
+    "ref_alt": 68.0,
     "volt_divisor": 7.0,
     "flight_state_map": {
         "0": "idle",
@@ -106,7 +108,10 @@ _DEFAULTS = {
     # body frame the view expects: +X nose/forward, +Y left, +Z up.
     "attitude_model_rotation": None,
     # Flip the sign of [roll, pitch, yaw] for IMUs of the opposite handedness.
-    "attitude_invert": [False, False, False]
+    "attitude_invert": [False, False, False],
+
+    # --- 3D trajectory view (ideal via RocketPy + live telemetry) ---
+    "rocket_config_path": "config/rocket_config.json"
 }
 
 
@@ -139,6 +144,35 @@ def load_config(force_reload=False):
 
     _config_cache = config
     return config
+
+
+def load_rocket_config(force_reload=False):
+    """Load the RocketPy input file pointed to by 'rocket_config_path'.
+
+    Returns a dict, or None if the file is missing/unparseable — callers
+    (rocket_sim.py) must treat None as "simulation not runnable" rather
+    than crash, same as a missing CAD model falls back to a placeholder
+    in the attitude view.
+    """
+    global _rocket_config_cache
+
+    if _rocket_config_cache is not None and not force_reload:
+        return _rocket_config_cache
+
+    path = get("rocket_config_path", "config/rocket_config.json")
+    resolved = resolve_path(path)
+
+    try:
+        with open(resolved, "r") as f:
+            _rocket_config_cache = json.load(f)
+    except FileNotFoundError:
+        print(f"[CONFIG] {resolved} not found — rocket simulation disabled.")
+        _rocket_config_cache = None
+    except json.JSONDecodeError as e:
+        print(f"[CONFIG] JSON parse error in {resolved}: {e} — rocket simulation disabled.")
+        _rocket_config_cache = None
+
+    return _rocket_config_cache
 
 
 def get(key, default=None):

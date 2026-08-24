@@ -1,0 +1,58 @@
+{
+  "_comment": "PLACEHOLDER ROCKET DATA. Every value below is a plausible-but-fake stand-in so the 'Run Simulation' button works out of the box. Replace with real numbers from CAD/motor datasheet before trusting the predicted trajectory.",
+
+  "environment": {
+    "latitude": 26.712196,
+    "longitude": 84.305725,
+    "elevation": 68.0,
+    "atmosphere_type": "standard_atmosphere",
+    "atmosphere_forecast_note": "Set atmosphere_type to 'forecast' and fill forecast_file only if there is internet at the range. 'standard_atmosphere' needs no network and is the safe default for field use."
+  },
+
+  "motor": {
+    "thrust_source": "config/motors/placeholder_motor.csv",
+    "dry_mass": 0.6,
+    "dry_inertia": [0.03, 0.03, 0.001],
+    "nozzle_radius": 0.015,
+    "grain_number": 5,
+    "grain_density": 1800,
+    "grain_outer_radius": 0.033,
+    "grain_initial_inner_radius": 0.015,
+    "grain_initial_height": 0.12,
+    "grain_separation": 0.005,
+    "grains_center_of_mass_position": 0.397,
+    "center_of_dry_mass_position": 0.317,
+    "nozzle_position": 0.0,
+    "burn_time": 2.0,
+    "throat_radius": 0.011,
+    "interpolation_method": "linear",
+    "coordinate_system_orientation": "nozzle_to_combustion_chamber"
+  },
+
+  "rocket": {
+    "radius": 0.04,
+    "mass": 5.0,
+    "inertia": [3.0, 3.0, 0.03],
+    "center_of_mass_without_motor": 0.5,
+    "coordinate_system_orientation": "tail_to_nose",
+    "power_off_drag": 0.5,
+    "power_on_drag": 0.5,
+    "motor_position": 0.05,
+    "nose": { "length": 0.15, "kind": "vonKarman", "position": 1.0 },
+    "fins": {
+      "n": 4,
+      "root_chord": 0.12,
+      "tip_chord": 0.06,
+      "span": 0.08,
+      "position": 0.1
+    },
+    "tail": null,
+    "rail_buttons": { "upper_button_position": 0.4, "lower_button_position": 0.1 }
+  },
+
+  "flight": {
+    "rail_length": 2.0,
+    "inclination": 85,
+    "heading": 0
+  }
+}

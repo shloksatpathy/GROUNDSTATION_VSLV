@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 from core.config import load_config
+from ui.trajectory_3d import Trajectory3DView
 
 
 def haversine_m(lat1, lon1, lat2, lon2):
@@ -51,6 +52,22 @@ def great_circle_points(lat1, lon1, lat2, lon2, n_points=100):
     return points
 
 
+def latlon_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
+    """Convert a lat/lon/alt fix to local East/North/Up meters relative to
+    a reference point.
+
+    Equirectangular flat-earth approximation — accurate enough at the
+    range scale of a rocket flight (a few km), and matches the local frame
+    RocketPy's Flight solution is already expressed in (see core/rocket_sim.py).
+    """
+    R = 6371000.0
+    lat0 = math.radians(ref_lat)
+    east = math.radians(lon - ref_lon) * R * math.cos(lat0)
+    north = math.radians(lat - ref_lat) * R
+    up = (alt - ref_alt) if alt is not None else 0.0
+    return east, north, up
+
+
 class MapTab(QWidget):
 
     def __init__(self):
@@ -59,36 +76,53 @@ class MapTab(QWidget):
         cfg = load_config()
         self.ref_lat = cfg.get("ref_lat", 26.712196)
         self.ref_lon = cfg.get("ref_lon", 84.305725)
+        self.ref_alt = cfg.get("ref_alt", 0.0)
 
         layout = QVBoxLayout()
-        
+
         map_layout = QHBoxLayout()
-        
+
         # Primary Map (centered on current position)
         self.map_view = QWebEngineView()
         self.map_view.setMinimumHeight(400)
-        
+
         # Secondary Map (Reference + current + line)
         self.map2_view = QWebEngineView()
         self.map2_view.setMinimumHeight(400)
-        
+
         map_layout.addWidget(self.map_view)
         map_layout.addWidget(self.map2_view)
 
         layout.addLayout(map_layout)
+
+        # 3D trajectory: ideal (RocketPy) vs live (telemetry) — full width
+        # below the two 2D maps, since it needs its own room to be legible.
+        self.trajectory_view = Trajectory3DView()
+        layout.addWidget(self.trajectory_view)
+
         self.setLayout(layout)
-        
+
         # Initialize with reference point
         self.update_map(self.ref_lat, self.ref_lon)
         self.update_ref_map(None, None)
 
-    def update_position(self, lat, lon):
+    def update_position(self, lat, lon, alt=None):
         """Called by dashboard when new coordinates arrive.
+
+        alt is optional (meters, same convention as telemetry altitude) —
+        fixes without an altimeter reading still update the 2D maps and
+        plot flat (up=0) on the 3D trajectory.
 
         Deliberately not named update() — that would shadow QWidget.update().
         """
         self.update_map(lat, lon)
         self.update_ref_map(lat, lon)
+        east, north, up = latlon_to_enu(lat, lon, alt, self.ref_lat, self.ref_lon, self.ref_alt)
+        self.trajectory_view.add_live_point(east, north, up)
+
+    def reset(self):
+        """Clear the live trajectory trace — called when recording restarts."""
+        self.trajectory_view.reset()
 
     def update_map(self, lat, lon):
         """Primary single-point map (re-centered on GNSS or REF)."""

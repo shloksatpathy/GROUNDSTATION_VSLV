@@ -203,6 +203,7 @@ class DashboardTab(QWidget):
         self.packet_count = 0
         self.table.setRowCount(0)
         self.attitude_view.reset()
+        self.map_tab.reset()
         try:
             self.recorder.start()
         except Exception as e:
@@ -254,11 +255,25 @@ class DashboardTab(QWidget):
                 if self.packet_count % 20 == 0:
                     lat_key = next((k for k in ["GNSS_LAT", "lat", "LAT", "latitude"] if k in enriched), None)
                     lon_key = next((k for k in ["GNSS_LON", "lon", "LON", "longitude"] if k in enriched), None)
-                    
+
                     if lat_key and lon_key:
                         lat, lon = enriched.get(lat_key), enriched.get(lon_key)
                         if lat is not None and lon is not None:
-                            self.map_tab.update_position(float(lat), float(lon))
+                            # Prefer the Kalman-filtered altitude; fall back to
+                            # the same raw keys TelemetryProcessor itself checks.
+                            alt = enriched.get("filtered_alt")
+                            if alt is None:
+                                alt_key = next(
+                                    (k for k in ["ALTITUDE_M", "altitude", "ALT", "alt"] if k in enriched),
+                                    None,
+                                )
+                                alt = enriched.get(alt_key) if alt_key else None
+                            try:
+                                alt = float(alt) if alt is not None else None
+                            except (TypeError, ValueError):
+                                alt = None
+
+                            self.map_tab.update_position(float(lat), float(lon), alt)
                 
                 # (5) Update data table dynamically
                 new_cols = [k for k in enriched.keys() if k not in self.table_columns]

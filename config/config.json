@@ -6,6 +6,7 @@
 
   "ref_lat": 26.712196,
   "ref_lon": 84.305725,
+  "ref_alt": 68.0,
   "volt_divisor": 7.0,
 
   "flight_state_map": {
@@ -21,5 +22,7 @@
   "attitude_model_size": 2.4,
   "attitude_model_scale": null,
   "attitude_model_rotation": null,
-  "attitude_invert": [false, false, false]
+  "attitude_invert": [false, false, false],
+
+  "rocket_config_path": "config/rocket_config.json"
 }
