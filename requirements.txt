@@ -6,3 +6,9 @@ pyqtgraph
 folium
 numpy
 PyOpenGL
+# Optional, heavy (pulls in scipy/matplotlib/netCDF4/etc). Powers the "ideal
+# trajectory" simulation on the Map & Tracking tab's 3D panel. The app runs
+# fine without it -- Run Simulation just shows a message and stays disabled.
+# Pinned: core/rocket_sim.py reads Flight.solution_array by column position,
+# which is a version-sensitive rocketpy internal.
+rocketpy==1.13.0
