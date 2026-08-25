@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
 
 from core.config import get, resolve_path, load_rocket_config
 from core.rocket_sim import ROCKETPY_AVAILABLE, ROCKETPY_IMPORT_ERROR
+from ui.trajectory_3d import Trajectory3DView
 
 
 class SimulationTab(QWidget):
@@ -64,6 +65,12 @@ class SimulationTab(QWidget):
         btn_layout.addWidget(self.run_button)
         layout.addLayout(btn_layout)
 
+        # Renders the same solve shown on the Map tab, without a second
+        # "Run Simulation" button/RocketSimThread — see Trajectory3DView's
+        # show_run_button and set_ideal_result/set_error docstrings.
+        self.preview = Trajectory3DView(show_run_button=False)
+        layout.addWidget(self.preview, stretch=1)
+
         self.setLayout(layout)
 
         self.load_button.clicked.connect(lambda: self.load_params())
@@ -71,8 +78,8 @@ class SimulationTab(QWidget):
         self.run_button.clicked.connect(self.save_and_run)
 
         if self.trajectory_view is not None:
-            self.trajectory_view.simulation_complete.connect(self._on_sim_ok)
-            self.trajectory_view.simulation_failed.connect(self._on_sim_err)
+            self.trajectory_view.simulation_complete.connect(self.preview.set_ideal_result)
+            self.trajectory_view.simulation_failed.connect(self.preview.set_error)
 
         # Initial load — silent, a modal dialog here would block the window from showing
         self.load_params(show_errors=False)
@@ -121,13 +128,3 @@ class SimulationTab(QWidget):
             return
         self.status_lbl.setText("Running simulation...")
         self.trajectory_view.run_simulation()
-
-    def _on_sim_ok(self, result):
-        self.status_lbl.setText(
-            f"Ideal apogee: {result['apogee_agl']:.1f} m AGL   "
-            f"Max speed: {result['max_speed']:.1f} m/s   "
-            "(see Map & Tracking for the trajectory)"
-        )
-
-    def _on_sim_err(self, message):
-        self.status_lbl.setText(f"Simulation error: {message}")

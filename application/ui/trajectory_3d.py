@@ -39,11 +39,12 @@ class Trajectory3DView(QWidget):
     simulation_complete = pyqtSignal(dict)
     simulation_failed = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, show_run_button=True):
         super().__init__(parent)
 
         self._live_points = []  # list of (east_m, north_m, up_m)
         self._sim_thread = None
+        self.run_btn = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 8, 10, 8)
@@ -87,13 +88,14 @@ class Trajectory3DView(QWidget):
         layout.addWidget(legend)
 
         btn_row = QHBoxLayout()
-        self.run_btn = QPushButton("Run Simulation")
-        if not ROCKETPY_AVAILABLE:
-            self.run_btn.setEnabled(False)
-            self.run_btn.setToolTip(f"rocketpy not installed ({ROCKETPY_IMPORT_ERROR})")
-        self.run_btn.clicked.connect(self.run_simulation)
         btn_row.addStretch()
-        btn_row.addWidget(self.run_btn)
+        if show_run_button:
+            self.run_btn = QPushButton("Run Simulation")
+            if not ROCKETPY_AVAILABLE:
+                self.run_btn.setEnabled(False)
+                self.run_btn.setToolTip(f"rocketpy not installed ({ROCKETPY_IMPORT_ERROR})")
+            self.run_btn.clicked.connect(self.run_simulation)
+            btn_row.addWidget(self.run_btn)
         if self.view is not None:
             reset_view_btn = QPushButton("Reset View")
             reset_view_btn.setToolTip("Restore the default camera angle (drag to orbit, scroll to zoom)")
@@ -192,7 +194,24 @@ class Trajectory3DView(QWidget):
     # Internals
     # -----------------------------------
     def _on_sim_ok(self, result):
-        self.run_btn.setEnabled(True)
+        if self.run_btn is not None:
+            self.run_btn.setEnabled(True)
+        self.set_ideal_result(result)
+        self.simulation_complete.emit(result)
+
+    def _on_sim_err(self, message):
+        if self.run_btn is not None:
+            self.run_btn.setEnabled(True)
+        self.set_error(message)
+        self.simulation_failed.emit(message)
+
+    def set_ideal_result(self, result):
+        """Plot an already-solved result and update the status label.
+
+        Public so a second, run-button-less view (ui/simulation_tab.py's
+        embedded preview) can mirror a solve driven by this instance's
+        RocketSimThread without owning a thread of its own.
+        """
         if self.view is not None and self.ideal_line is not None:
             pts = np.column_stack([result["x"], result["y"], result["z"]]).astype(np.float32)
             self.ideal_line.setData(pos=pts)
@@ -200,12 +219,10 @@ class Trajectory3DView(QWidget):
             f"Ideal apogee: {result['apogee_agl']:.1f} m AGL   "
             f"Max speed: {result['max_speed']:.1f} m/s"
         )
-        self.simulation_complete.emit(result)
 
-    def _on_sim_err(self, message):
-        self.run_btn.setEnabled(True)
+    def set_error(self, message):
+        """Show a solve failure — see set_ideal_result's docstring."""
         self.status_lbl.setText(f"Simulation error: {message}")
-        self.simulation_failed.emit(message)
 
     def _unavailable_label(self, message):
         lbl = QLabel(message)
