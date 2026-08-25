@@ -6,6 +6,7 @@ from PyQt5.QtGui import QIcon, QPalette, QColor
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.packet_editor_tab import PacketEditorTab
+from ui.simulation_tab import SimulationTab
 from core.serial_manager import SerialManager
 from core.packet_parser import PacketParser
 
@@ -39,9 +40,13 @@ class GroundStation(QMainWindow):
         self.map_tab = MapTab()
         self.dashboard = DashboardTab(self.serial, self.map_tab, self.parser)
         self.packet_editor = PacketEditorTab(self.parser)
+        # Shares self.map_tab.trajectory_view's RocketSimThread rather than
+        # owning a second one — see ui/simulation_tab.py.
+        self.simulation_tab = SimulationTab(self.map_tab.trajectory_view)
 
         self.tabs.addTab(self.dashboard, "Telemetry Dashboard")
         self.tabs.addTab(self.map_tab, "Map & Tracking")
+        self.tabs.addTab(self.simulation_tab, "Simulation Setup")
         self.tabs.addTab(self.packet_editor, "Packet Format")
 
         self.setCentralWidget(self.tabs)

@@ -11,7 +11,7 @@ instead of taking the app down.
 import traceback
 
 import numpy as np
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QWidget
 
 from core.rocket_sim import RocketSimThread, ROCKETPY_AVAILABLE, ROCKETPY_IMPORT_ERROR
@@ -32,6 +32,12 @@ _MAX_LIVE_POINTS = 2000
 
 class Trajectory3DView(QWidget):
     """Panel with a 3D plot of the ideal (simulated) and live (telemetry) trajectories."""
+
+    # Emitted after a RocketSimThread solve so other views (ui/map_tab.py's
+    # ground-track overlay, ui/simulation_tab.py's status label) can react
+    # without each owning a second RocketSimThread.
+    simulation_complete = pyqtSignal(dict)
+    simulation_failed = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -194,10 +200,12 @@ class Trajectory3DView(QWidget):
             f"Ideal apogee: {result['apogee_agl']:.1f} m AGL   "
             f"Max speed: {result['max_speed']:.1f} m/s"
         )
+        self.simulation_complete.emit(result)
 
     def _on_sim_err(self, message):
         self.run_btn.setEnabled(True)
         self.status_lbl.setText(f"Simulation error: {message}")
+        self.simulation_failed.emit(message)
 
     def _unavailable_label(self, message):
         lbl = QLabel(message)

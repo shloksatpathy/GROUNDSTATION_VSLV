@@ -52,6 +52,20 @@ def great_circle_points(lat1, lon1, lat2, lon2, n_points=100):
     return points
 
 
+def enu_to_latlon(east, north, ref_lat, ref_lon):
+    """Inverse of latlon_to_enu's horizontal projection — East/North meters
+    relative to the reference point back to lat/lon.
+
+    Used to project the RocketPy "ideal" trajectory (local ENU, origin at
+    the pad) onto the 2D map as a ground-track polyline.
+    """
+    R = 6371000.0
+    lat0 = math.radians(ref_lat)
+    lat = ref_lat + math.degrees(north / R)
+    lon = ref_lon + math.degrees(east / (R * math.cos(lat0)))
+    return lat, lon
+
+
 def latlon_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
     """Convert a lat/lon/alt fix to local East/North/Up meters relative to
     a reference point.
@@ -68,6 +82,12 @@ def latlon_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
     return east, north, up
 
 
+# Decimate the live ground track beyond this many points — mirrors
+# ui/trajectory_3d.py's _MAX_LIVE_POINTS so a long flight stays cheap to
+# redraw as a folium PolyLine.
+_MAX_LIVE_TRACK_POINTS = 2000
+
+
 class MapTab(QWidget):
 
     def __init__(self):
@@ -77,6 +97,11 @@ class MapTab(QWidget):
         self.ref_lat = cfg.get("ref_lat", 26.712196)
         self.ref_lon = cfg.get("ref_lon", 84.305725)
         self.ref_alt = cfg.get("ref_alt", 0.0)
+
+        # Ground-track overlay state — the ideal (RocketPy) track is set once
+        # per simulation run; the live track accumulates GNSS fixes.
+        self._ideal_track = None  # list of [lat, lon], or None before a sim run
+        self._live_track = []     # list of [lat, lon]
 
         layout = QVBoxLayout()
 
@@ -100,6 +125,8 @@ class MapTab(QWidget):
         self.trajectory_view = Trajectory3DView()
         layout.addWidget(self.trajectory_view)
 
+        self.trajectory_view.simulation_complete.connect(self._on_sim_result)
+
         self.setLayout(layout)
 
         # Initialize with reference point
@@ -115,20 +142,67 @@ class MapTab(QWidget):
 
         Deliberately not named update() — that would shadow QWidget.update().
         """
+        self._live_track.append([lat, lon])
+        if len(self._live_track) > _MAX_LIVE_TRACK_POINTS:
+            self._live_track = self._live_track[::2]
+
         self.update_map(lat, lon)
         self.update_ref_map(lat, lon)
         east, north, up = latlon_to_enu(lat, lon, alt, self.ref_lat, self.ref_lon, self.ref_alt)
         self.trajectory_view.add_live_point(east, north, up)
 
     def reset(self):
-        """Clear the live trajectory trace — called when recording restarts."""
+        """Clear the live trajectory trace — called when recording restarts.
+
+        The ideal (simulated) ground track is left in place, same as
+        ui/trajectory_3d.py's reset() — it's a standing pre-launch
+        reference, not per-recording state.
+        """
+        self._live_track = []
         self.trajectory_view.reset()
 
+    def _on_sim_result(self, result):
+        """Project the RocketPy solve's local ENU trajectory to lat/lon and
+        redraw the map with the new ideal ground track."""
+        self._ideal_track = [
+            list(enu_to_latlon(east, north, self.ref_lat, self.ref_lon))
+            for east, north in zip(result["x"], result["y"])
+        ]
+        last = self._live_track[-1] if self._live_track else [self.ref_lat, self.ref_lon]
+        self.update_map(last[0], last[1])
+
     def update_map(self, lat, lon):
-        """Primary single-point map (re-centered on GNSS or REF)."""
+        """Primary map — re-centered on GNSS or REF, with the ideal
+        (RocketPy) and live ground tracks drawn as overlaid polylines."""
         try:
             m = folium.Map(location=[lat, lon], zoom_start=15, tiles="CartoDB dark_matter")
-            folium.CircleMarker([lat, lon], radius=6, popup="Current Position").add_to(m)
+
+            if self._ideal_track:
+                folium.PolyLine(
+                    self._ideal_track, color="#4C99FF", weight=3, opacity=0.85,
+                    tooltip="Ideal trajectory (RocketPy)",
+                ).add_to(m)
+
+            if len(self._live_track) > 1:
+                folium.PolyLine(
+                    self._live_track, color="#FF9E42", weight=3, opacity=0.9,
+                    tooltip="Live trajectory (GNSS)",
+                ).add_to(m)
+
+            folium.CircleMarker([lat, lon], radius=6, color="#FF9E42",
+                                 fill=True, fill_opacity=1.0, popup="Current Position").add_to(m)
+
+            if self._ideal_track or self._live_track:
+                legend_html = """
+                <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9999;
+                            background: rgba(0,0,0,0.65); color: #fff; font-size: 12px;
+                            padding: 6px 10px; border-radius: 6px;">
+                  <span style="color:#4C99FF;">&#9632;</span> ideal (RocketPy)&nbsp;&nbsp;
+                  <span style="color:#FF9E42;">&#9632;</span> live (GNSS)
+                </div>
+                """
+                m.get_root().html.add_child(folium.Element(legend_html))
+
             data = io.BytesIO()
             m.save(data, close_file=False)
             self.map_view.setHtml(data.getvalue().decode())
