@@ -1,11 +1,13 @@
-pandas 
+pandas
 PyQt5
 PyQtWebEngine
-pyserial 
+pyserial
 pyqtgraph
 folium
 numpy
 PyOpenGL
+requests
+Pillow
 # Optional, heavy (pulls in scipy/matplotlib/netCDF4/etc). Powers the "ideal
 # trajectory" simulation on the Map & Tracking tab's 3D panel. The app runs
 # fine without it -- Run Simulation just shows a message and stays disabled.
