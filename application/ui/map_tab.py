@@ -52,20 +52,6 @@ def great_circle_points(lat1, lon1, lat2, lon2, n_points=100):
     return points
 
 
-def enu_to_latlon(east, north, ref_lat, ref_lon):
-    """Inverse of latlon_to_enu's horizontal projection — East/North meters
-    relative to the reference point back to lat/lon.
-
-    Used to project the RocketPy "ideal" trajectory (local ENU, origin at
-    the pad) onto the 2D map as a ground-track polyline.
-    """
-    R = 6371000.0
-    lat0 = math.radians(ref_lat)
-    lat = ref_lat + math.degrees(north / R)
-    lon = ref_lon + math.degrees(east / (R * math.cos(lat0)))
-    return lat, lon
-
-
 def latlon_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
     """Convert a lat/lon/alt fix to local East/North/Up meters relative to
     a reference point.
@@ -105,27 +91,31 @@ class MapTab(QWidget):
 
         layout = QVBoxLayout()
 
-        map_layout = QHBoxLayout()
+        panes_layout = QHBoxLayout()
 
-        # Primary Map (centered on current position)
+        # Left pane: primary 2D map (centered on current position) stacked
+        # above the 3D trajectory view (ideal vs live), since both track the
+        # same "where is it now" story.
         self.map_view = QWebEngineView()
         self.map_view.setMinimumHeight(400)
 
-        # Secondary Map (Reference + current + line)
+        self.trajectory_view = Trajectory3DView()
+        self.trajectory_view.simulation_complete.connect(self._on_sim_result)
+
+        left_pane = QVBoxLayout()
+        left_pane.addWidget(self.map_view)
+        left_pane.addWidget(self.trajectory_view)
+        left_widget = QWidget()
+        left_widget.setLayout(left_pane)
+
+        # Right pane: reference + current position + geodesic line.
         self.map2_view = QWebEngineView()
         self.map2_view.setMinimumHeight(400)
 
-        map_layout.addWidget(self.map_view)
-        map_layout.addWidget(self.map2_view)
+        panes_layout.addWidget(left_widget)
+        panes_layout.addWidget(self.map2_view)
 
-        layout.addLayout(map_layout)
-
-        # 3D trajectory: ideal (RocketPy) vs live (telemetry) — full width
-        # below the two 2D maps, since it needs its own room to be legible.
-        self.trajectory_view = Trajectory3DView()
-        layout.addWidget(self.trajectory_view)
-
-        self.trajectory_view.simulation_complete.connect(self._on_sim_result)
+        layout.addLayout(panes_layout)
 
         self.setLayout(layout)
 
