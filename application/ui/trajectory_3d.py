@@ -11,10 +11,11 @@ instead of taking the app down.
 import io
 import math
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from PyQt5.QtCore import Qt, pyqtSignal, QThread
-from PyQt5.QtGui import QMatrix4x4
+from PyQt5.QtCore import Qt, pyqtSignal, QThread, QTimer
+from PyQt5.QtGui import QMatrix4x4, QVector3D
 from PyQt5.QtWidgets import QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QWidget
 
 from core.config import load_config
@@ -51,8 +52,15 @@ _TILE_SIZE = 256
 _TILE_USER_AGENT = "VSSSIC-GroundStation-MapTab/1.0"
 
 # Coverage before any simulation has run — re-fetched wider (see
-# set_ideal_result) once the ideal trajectory's actual extent is known.
+# set_ideal_result) once the ideal trajectory's actual extent is known, and
+# again on the fly as the camera pans/zooms (see _poll_camera_for_basemap).
 _DEFAULT_HALF_EXTENT_M = 250.0
+
+# Upper bound on what a single fetch will cover, regardless of how far a
+# trajectory drifts or how far the camera zooms out -- keeps a runaway
+# simulation result or an aggressive scroll-out from requesting an
+# unbounded tile grid.
+_MAX_HALF_EXTENT_M = 50000.0
 
 
 def _deg2tile(lat, lon, zoom):
@@ -80,6 +88,29 @@ def _pick_zoom(lat, half_extent_m, tiles_per_side):
     return int(max(2, min(19, round(zoom))))
 
 
+def _tiles_per_side_for_extent(half_extent_m):
+    """More tiles for a wider requested area, capped so a fully panned-out
+    view still fetches a bounded number of tiles -- resolution drops via
+    _pick_zoom's coarser zoom instead of the tile count growing without end.
+    """
+    if half_extent_m <= 400:
+        return 3
+    if half_extent_m <= 3000:
+        return 5
+    return 7
+
+
+def _enu_to_latlon(east_m, north_m, ref_lat, ref_lon):
+    """Inverse of the East/North-meters-from-ref projection used throughout
+    this module. Lets a basemap fetch be centered wherever the camera has
+    panned to, not just the reference point."""
+    R = 6371000.0
+    lat0 = math.radians(ref_lat)
+    lat = ref_lat + math.degrees(north_m / R)
+    lon = ref_lon + math.degrees(east_m / (R * math.cos(lat0)))
+    return lat, lon
+
+
 def _fetch_tile_image(z, x, y, timeout=5):
     n = 2 ** z
     x %= n
@@ -90,24 +121,35 @@ def _fetch_tile_image(z, x, y, timeout=5):
     return Image.open(io.BytesIO(resp.content)).convert("RGBA")
 
 
-def _build_basemap(ref_lat, ref_lon, half_extent_m, tiles_per_side):
+def _build_basemap(ref_lat, ref_lon, center_east_m, center_north_m, half_extent_m, tiles_per_side):
     """Fetch and stitch a tiles_per_side x tiles_per_side tile grid centered
-    on ref_lat/ref_lon, wide enough to roughly cover 2*half_extent_m.
+    on (center_east_m, center_north_m) -- local ENU meters relative to
+    ref_lat/ref_lon, e.g. wherever the camera has panned to -- wide enough
+    to roughly cover 2*half_extent_m.
 
     Returns (rgba_array, west_m, south_m, span_east_m, span_north_m) — the
     array in the (x, y, RGBA) layout GLImageItem expects, and the stitched
     image's footprint in local East/North meters relative to the reference
-    point (same ENU frame as the trajectory lines).
+    point (same ENU frame as the trajectory lines, regardless of what point
+    the fetch itself was centered on).
     """
-    zoom = _pick_zoom(ref_lat, half_extent_m, tiles_per_side)
-    cx, cy = _deg2tile(ref_lat, ref_lon, zoom)
+    center_lat, center_lon = _enu_to_latlon(center_east_m, center_north_m, ref_lat, ref_lon)
+
+    zoom = _pick_zoom(center_lat, half_extent_m, tiles_per_side)
+    cx, cy = _deg2tile(center_lat, center_lon, zoom)
     half = tiles_per_side // 2
     x0, y0 = cx - half, cy - half
 
+    # Fetched in parallel -- at the largest grid (7x7 = 49 tiles) sequential
+    # requests could take the better part of a minute on an ordinary
+    # connection, which would make panning/zooming feel broken rather than
+    # like a map. This already runs on BasemapFetchThread, off the GUI
+    # thread, so blocking here on the pool is fine.
     composite = Image.new("RGBA", (_TILE_SIZE * tiles_per_side, _TILE_SIZE * tiles_per_side))
-    for row in range(tiles_per_side):
-        for col in range(tiles_per_side):
-            tile = _fetch_tile_image(zoom, x0 + col, y0 + row)
+    coords = [(row, col) for row in range(tiles_per_side) for col in range(tiles_per_side)]
+    with ThreadPoolExecutor(max_workers=min(16, len(coords))) as pool:
+        tiles = pool.map(lambda rc: _fetch_tile_image(zoom, x0 + rc[1], y0 + rc[0]), coords)
+        for (row, col), tile in zip(coords, tiles):
             composite.paste(tile, (col * _TILE_SIZE, row * _TILE_SIZE))
 
     # (x0, y0) is the NW-most tile's NW corner; the SE-most tile's SE corner
@@ -140,16 +182,22 @@ class BasemapFetchThread(QThread):
     finished_ok = pyqtSignal(object)
     finished_err = pyqtSignal(str)
 
-    def __init__(self, ref_lat, ref_lon, half_extent_m, tiles_per_side):
+    def __init__(self, ref_lat, ref_lon, center_east_m, center_north_m, half_extent_m, tiles_per_side):
         super().__init__()
         self.ref_lat = ref_lat
         self.ref_lon = ref_lon
+        self.center_east_m = center_east_m
+        self.center_north_m = center_north_m
         self.half_extent_m = half_extent_m
         self.tiles_per_side = tiles_per_side
 
     def run(self):
         try:
-            result = _build_basemap(self.ref_lat, self.ref_lon, self.half_extent_m, self.tiles_per_side)
+            result = _build_basemap(
+                self.ref_lat, self.ref_lon,
+                self.center_east_m, self.center_north_m,
+                self.half_extent_m, self.tiles_per_side,
+            )
             self.finished_ok.emit(result)
         except Exception as e:
             self.finished_err.emit(str(e))
@@ -175,6 +223,11 @@ class Trajectory3DView(QWidget):
         self._sim_thread = None
         self._basemap_item = None
         self._basemap_thread = None
+        self._basemap_fetch_pending = False
+        self._basemap_center = None        # (east_m, north_m) of the last requested fetch
+        self._basemap_half_extent = None   # half-extent (m) of the last requested fetch
+        self._camera_poll_snapshot = None
+        self._camera_timer = None
         self.run_btn = None
 
         layout = QVBoxLayout()
@@ -197,7 +250,23 @@ class Trajectory3DView(QWidget):
             try:
                 self._build_scene()
                 layout.addWidget(self.view, stretch=1)
-                self._load_basemap(_DEFAULT_HALF_EXTENT_M)
+
+                # Size the very first fetch to what the default camera framing
+                # (set by reset_view() inside _build_scene) actually shows,
+                # rather than a flat constant — otherwise the camera-poll
+                # timer below immediately judges the flat default "stale"
+                # and re-fetches within its first tick.
+                initial_half_extent = self._extent_for_camera(
+                    self.view.opts.get('distance', 300.0), self.view.opts.get('fov', 60.0)
+                )
+                self._request_basemap(0.0, 0.0, initial_half_extent)
+
+                # Polls the camera each tick to reload terrain as the user
+                # pans/zooms — see _poll_camera_for_basemap's docstring.
+                self._camera_timer = QTimer(self)
+                self._camera_timer.setInterval(500)
+                self._camera_timer.timeout.connect(self._poll_camera_for_basemap)
+                self._camera_timer.start()
             except Exception as e:
                 traceback.print_exc()
                 self.view = None
@@ -222,6 +291,7 @@ class Trajectory3DView(QWidget):
         if self.view is not None:
             controls_hint = QLabel(
                 "Drag to orbit · scroll to zoom · Ctrl+drag (or middle-drag) to pan"
+                " — terrain reloads as you move"
             )
             controls_hint.setAlignment(Qt.AlignCenter)
             controls_hint.setStyleSheet("color:#888; font-size:9px;")
@@ -311,32 +381,94 @@ class Trajectory3DView(QWidget):
         self.view.addItem(self.live_line)
 
     def reset_view(self):
-        """Restore the default camera framing."""
+        """Restore the default camera framing and pan position."""
         if self.view is not None:
-            self.view.setCameraPosition(distance=300, elevation=20, azimuth=135)
+            self.view.setCameraPosition(
+                pos=QVector3D(0.0, 0.0, 0.0), distance=300, elevation=20, azimuth=135,
+            )
 
     # -----------------------------------
     # Basemap
     # -----------------------------------
-    def _load_basemap(self, half_extent_m):
-        """Fetch map tiles covering roughly +/-half_extent_m around the
-        reference point and lay them flat under the grid, on a background
-        thread. No-op if tiles/network aren't available — the bare grid is
-        still a fully usable trajectory view without it."""
-        if self.view is None or requests is None or Image is None:
+    def _poll_camera_for_basemap(self):
+        """Runs on a timer while the view is visible: reloads terrain as the
+        camera pans or zooms, the way a 2D web map loads new tiles as you
+        navigate. Debounced by only acting once two consecutive polls see
+        the same camera reading, so a drag gesture doesn't trigger a fetch
+        on every intermediate frame — only once it settles."""
+        if self.view is None:
             return
-        if self._basemap_thread is not None and self._basemap_thread.isRunning():
+        center = self.view.opts.get('center')
+        if center is None:
+            return
+        distance = self.view.opts.get('distance', 300.0)
+        fov = self.view.opts.get('fov', 60.0)
+
+        snapshot = (round(center.x(), 1), round(center.y(), 1), round(distance, 1), round(fov, 2))
+        if snapshot != self._camera_poll_snapshot:
+            self._camera_poll_snapshot = snapshot
+            return  # camera is still moving -- wait for it to settle
+
+        target_half_extent = self._extent_for_camera(distance, fov)
+        self._maybe_refresh_basemap(center.x(), center.y(), target_half_extent)
+
+    def _extent_for_camera(self, distance, fov):
+        """Roughly how much ground (half-extent, meters) is visible at the
+        current zoom. 2*distance*tan(fov/2) is the span at the focal plane;
+        the 1.5x pad means panning to the edge of the current view doesn't
+        immediately run past the edge of what's loaded."""
+        visible_span_m = 2.0 * distance * math.tan(math.radians(fov / 2.0)) * 1.5
+        return max(_DEFAULT_HALF_EXTENT_M, min(visible_span_m, _MAX_HALF_EXTENT_M))
+
+    def _maybe_refresh_basemap(self, center_east_m, center_north_m, target_half_extent):
+        """Only re-fetch once the loaded terrain is actually stale for the
+        current view -- otherwise every settle of the camera (including a
+        tiny nudge) would re-download tiles."""
+        if self._basemap_half_extent is None:
+            self._request_basemap(center_east_m, center_north_m, target_half_extent)
             return
 
-        tiles_per_side = 3 if half_extent_m <= 600 else 5
+        moved_m = math.hypot(
+            center_east_m - self._basemap_center[0],
+            center_north_m - self._basemap_center[1],
+        )
+        stale = (
+            target_half_extent > self._basemap_half_extent * 1.15  # zoomed out past coverage
+            or target_half_extent < self._basemap_half_extent * 0.4  # zoomed in, resolution too coarse
+            or moved_m > self._basemap_half_extent * 0.5  # panned toward the edge
+        )
+        if stale:
+            self._request_basemap(center_east_m, center_north_m, target_half_extent)
+
+    def _request_basemap(self, center_east_m, center_north_m, half_extent_m):
+        """Fetch map tiles centered on (center_east_m, center_north_m) --
+        local ENU meters relative to the reference point -- covering
+        roughly +/-half_extent_m, on a background thread. No-op if tiles/
+        network aren't available — the bare grid is still a fully usable
+        trajectory view without it."""
+        if self.view is None or requests is None or Image is None:
+            return
+        # A plain flag rather than self._basemap_thread.isRunning(): the
+        # flag flips the instant we decide to fetch, with no dependency on
+        # exactly when Qt marks the new QThread as started.
+        if self._basemap_fetch_pending:
+            return
+
+        self._basemap_fetch_pending = True
+        self._basemap_center = (center_east_m, center_north_m)
+        self._basemap_half_extent = half_extent_m
+
+        tiles_per_side = _tiles_per_side_for_extent(half_extent_m)
         self._basemap_thread = BasemapFetchThread(
-            self.ref_lat, self.ref_lon, half_extent_m, tiles_per_side
+            self.ref_lat, self.ref_lon, center_east_m, center_north_m,
+            half_extent_m, tiles_per_side,
         )
         self._basemap_thread.finished_ok.connect(self._on_basemap_ok)
         self._basemap_thread.finished_err.connect(self._on_basemap_err)
         self._basemap_thread.start()
 
     def _on_basemap_ok(self, result):
+        self._basemap_fetch_pending = False
         arr, west_m, south_m, span_e_m, span_n_m = result
         w, h = arr.shape[0], arr.shape[1]
 
@@ -353,6 +485,7 @@ class Trajectory3DView(QWidget):
         self._basemap_item.setTransform(transform)
 
     def _on_basemap_err(self, message):
+        self._basemap_fetch_pending = False
         print(f"[TRAJECTORY] basemap unavailable — {message}")
 
     # -----------------------------------
@@ -421,8 +554,24 @@ class Trajectory3DView(QWidget):
             pts = np.column_stack([result["x"], result["y"], result["z"]]).astype(np.float32)
             self.ideal_line.setData(pos=pts)
             xy_extent = max(np.abs(pts[:, 0]).max(), np.abs(pts[:, 1]).max(), 1.0)
-            half_extent_m = max(_DEFAULT_HALF_EXTENT_M, min(xy_extent * 1.2, 5000.0))
-            self._load_basemap(half_extent_m)
+            half_extent_m = max(_DEFAULT_HALF_EXTENT_M, min(xy_extent * 1.2, _MAX_HALF_EXTENT_M))
+
+            # Re-center and zoom the camera out to actually frame the
+            # trajectory -- without this, the camera stays wherever it was
+            # (its unrelated default distance, or wherever the user had
+            # panned to), and _poll_camera_for_basemap (next tick) would see
+            # a basemap that disagrees with what that camera implies and
+            # immediately reload to match it back, fighting this call
+            # instead of showing the new trajectory's terrain.
+            # Inverse of _extent_for_camera's visible_span_m = 2*distance*
+            # tan(fov/2)*1.5, solved for distance.
+            fov = self.view.opts.get('fov', 60.0)
+            target_distance = half_extent_m / (3.0 * math.tan(math.radians(fov / 2.0)))
+            self.view.setCameraPosition(
+                pos=QVector3D(0.0, 0.0, 0.0), distance=max(target_distance, 100.0),
+            )
+
+            self._request_basemap(0.0, 0.0, half_extent_m)
         self.status_lbl.setText(
             f"Ideal apogee: {result['apogee_agl']:.1f} m AGL   "
             f"Max speed: {result['max_speed']:.1f} m/s"
