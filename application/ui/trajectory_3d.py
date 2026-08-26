@@ -220,6 +220,13 @@ class Trajectory3DView(QWidget):
         layout.addWidget(legend)
 
         if self.view is not None:
+            controls_hint = QLabel(
+                "Drag to orbit · scroll to zoom · Ctrl+drag (or middle-drag) to pan"
+            )
+            controls_hint.setAlignment(Qt.AlignCenter)
+            controls_hint.setStyleSheet("color:#888; font-size:9px;")
+            layout.addWidget(controls_hint)
+
             attribution = QLabel(
                 '<span style="color:#666;">Basemap © CARTO, © OpenStreetMap contributors</span>'
             )
@@ -238,7 +245,10 @@ class Trajectory3DView(QWidget):
             btn_row.addWidget(self.run_btn)
         if self.view is not None:
             reset_view_btn = QPushButton("Reset View")
-            reset_view_btn.setToolTip("Restore the default camera angle (drag to orbit, scroll to zoom)")
+            reset_view_btn.setToolTip(
+                "Restore the default camera angle\n"
+                "Drag to orbit, scroll to zoom, Ctrl+drag (or middle-drag) to pan the map"
+            )
             reset_view_btn.clicked.connect(self.reset_view)
             btn_row.addWidget(reset_view_btn)
         btn_row.addStretch()
@@ -266,7 +276,20 @@ class Trajectory3DView(QWidget):
         self.view.addItem(grid)
 
         # Launch pad marker at the local-frame origin.
-        pad = gl.GLScatterPlotItem(pos=np.array([[0.0, 0.0, 0.0]]), color=(1, 1, 1, 1), size=12)
+        #
+        # glOptions='translucent' is deliberate on every item below: pyqtgraph's
+        # GLLinePlotItem/GLScatterPlotItem default to glOptions='additive',
+        # which disables GL_DEPTH_TEST. That's invisible as long as nothing
+        # opaque is drawn after them — but the basemap image is, and without
+        # depth testing the line has no way to win against it, so it renders
+        # as barely-visible fragments (only where the grid's own depth-tested
+        # pixels happen to coincide). 'translucent' keeps depth testing on so
+        # the trajectory and pad marker correctly render in front of the
+        # basemap instead of being swallowed by it.
+        pad = gl.GLScatterPlotItem(
+            pos=np.array([[0.0, 0.0, 0.0]]), color=(1, 1, 1, 1), size=12,
+            glOptions='translucent',
+        )
         self.view.addItem(pad)
 
         self.ideal_line = gl.GLLinePlotItem(
@@ -274,6 +297,7 @@ class Trajectory3DView(QWidget):
             color=(0.30, 0.60, 1.00, 1.0),
             width=2,
             antialias=True,
+            glOptions='translucent',
         )
         self.view.addItem(self.ideal_line)
 
@@ -282,6 +306,7 @@ class Trajectory3DView(QWidget):
             color=(1.00, 0.62, 0.26, 1.0),
             width=3,
             antialias=True,
+            glOptions='translucent',
         )
         self.view.addItem(self.live_line)
 
