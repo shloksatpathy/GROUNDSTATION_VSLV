@@ -466,6 +466,10 @@ class Trajectory3DView(QWidget):
         self._terrain_fetch_pending = False
         self._terrain_center = None        # (east_m, north_m) of the last requested fetch
         self._terrain_half_extent = None   # half-extent (m) of the last requested fetch
+        # Bumped whenever the reference point moves (see set_reference) so a
+        # fetch still in flight for the old origin is discarded on arrival
+        # instead of being drawn in the wrong place.
+        self._ref_generation = 0
         # Sea-level elevation under the pad, learned from the first fetch that
         # covers the origin. Terrain is drawn relative to it so the ground sits
         # at z=0 under the pad, matching the AGL frame the trajectories use.
@@ -710,12 +714,15 @@ class Trajectory3DView(QWidget):
             self.ref_lat, self.ref_lon, center_east_m, center_north_m,
             half_extent_m, self.terrain_exaggeration, self.terrain_basemap_url,
         )
-        self._terrain_thread.finished_ok.connect(self._on_terrain_ok)
-        self._terrain_thread.finished_err.connect(self._on_terrain_err)
+        gen = self._ref_generation
+        self._terrain_thread.finished_ok.connect(lambda r, g=gen: self._on_terrain_ok(r, g))
+        self._terrain_thread.finished_err.connect(lambda m, g=gen: self._on_terrain_err(m, g))
         self._terrain_thread.start()
 
-    def _on_terrain_ok(self, result):
+    def _on_terrain_ok(self, result, gen=None):
         self._terrain_fetch_pending = False
+        if gen is not None and gen != self._ref_generation:
+            return  # fetched around a reference point that has since moved
 
         if result["origin_elev"] is not None and self._pad_elev_m is None:
             self._pad_elev_m = result["origin_elev"]
@@ -747,8 +754,10 @@ class Trajectory3DView(QWidget):
             self._terrain_flat_warned = True
             print("[TRAJECTORY] elevation tiles unavailable — terrain is flat")
 
-    def _on_terrain_err(self, message):
+    def _on_terrain_err(self, message, gen=None):
         self._terrain_fetch_pending = False
+        if gen is not None and gen != self._ref_generation:
+            return
         print(f"[TRAJECTORY] terrain unavailable — {message}")
 
     # -----------------------------------
@@ -764,6 +773,45 @@ class Trajectory3DView(QWidget):
         if self.view is not None and self.live_line is not None:
             pts = np.array(self._live_points, dtype=np.float32)
             self.live_line.setData(pos=pts)
+
+    def set_reference(self, ref_lat, ref_lon):
+        """Move the local frame's origin to a new lat/lon.
+
+        Everything already drawn is expressed in ENU meters relative to the
+        old origin, so the live trace and the loaded terrain are both stale:
+        both are dropped and the relief re-fetched around the new point. The
+        ideal trajectory is left alone — it comes from RocketPy's own launch
+        site in rocket_config.json, which only a re-run changes.
+        """
+        self.ref_lat = float(ref_lat)
+        self.ref_lon = float(ref_lon)
+        self._ref_generation += 1
+
+        self.reset()
+
+        self._pad_elev_m = None
+        self._terrain_flat_warned = False
+        self._terrain_center = None
+        self._terrain_half_extent = None
+        self._camera_poll_snapshot = None
+
+        if self.view is None:
+            return
+
+        if self._terrain_item is not None:
+            self.view.removeItem(self._terrain_item)
+            self._terrain_item = None
+
+        self.reset_view()
+
+        # A fetch already in flight is for the old origin; its result is
+        # discarded on the generation check, and _poll_camera_for_terrain
+        # re-requests within a tick or two because the half-extent is now
+        # None. Starting a second thread here would just race it.
+        if not self._terrain_fetch_pending:
+            self._request_terrain(0.0, 0.0, self._extent_for_camera(
+                self.view.opts.get('distance', 300.0), self.view.opts.get('fov', 60.0),
+            ))
 
     def run_simulation(self):
         """Kick off a RocketPy solve on a background thread."""
