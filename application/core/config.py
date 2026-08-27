@@ -111,7 +111,18 @@ _DEFAULTS = {
     "attitude_invert": [False, False, False],
 
     # --- 3D trajectory view (ideal via RocketPy + live telemetry) ---
-    "rocket_config_path": "config/rocket_config.json"
+    "rocket_config_path": "config/rocket_config.json",
+    # Vertical exaggeration of the shaded-relief terrain under the trajectory.
+    # 1.0 is true scale, which is what you want when reading terrain clearance
+    # off the plot; raise it to dramatise low relief, at the cost of the
+    # ground no longer being to the same scale as the trajectory beside it.
+    "terrain_exaggeration": 1.0,
+    # Optional {s}/{z}/{x}/{y} tile URL draped over the relief for map context
+    # (water, roads, built-up areas). Left off by default because the obvious
+    # free sources now watermark keyless requests — set it to a tile endpoint
+    # you have rights to, e.g.
+    #   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?api_key=..."
+    "terrain_basemap_url": None
 }
 
 
