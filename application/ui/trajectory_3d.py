@@ -445,7 +445,7 @@ class Trajectory3DView(QWidget):
     simulation_complete = pyqtSignal(dict)
     simulation_failed = pyqtSignal(str)
 
-    def __init__(self, parent=None, show_run_button=True):
+    def __init__(self, parent=None):
         super().__init__(parent)
 
         cfg = load_config()
@@ -559,13 +559,12 @@ class Trajectory3DView(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        if show_run_button:
-            self.run_btn = QPushButton("Run Simulation")
-            if not ROCKETPY_AVAILABLE:
-                self.run_btn.setEnabled(False)
-                self.run_btn.setToolTip(f"rocketpy not installed ({ROCKETPY_IMPORT_ERROR})")
-            self.run_btn.clicked.connect(self.run_simulation)
-            btn_row.addWidget(self.run_btn)
+        self.run_btn = QPushButton("Run Simulation")
+        if not ROCKETPY_AVAILABLE:
+            self.run_btn.setEnabled(False)
+            self.run_btn.setToolTip(f"rocketpy not installed ({ROCKETPY_IMPORT_ERROR})")
+        self.run_btn.clicked.connect(self.run_simulation)
+        btn_row.addWidget(self.run_btn)
         if self.view is not None:
             reset_view_btn = QPushButton("Reset View")
             reset_view_btn.setToolTip(
@@ -855,12 +854,7 @@ class Trajectory3DView(QWidget):
         self.simulation_failed.emit(message)
 
     def set_ideal_result(self, result):
-        """Plot an already-solved result and update the status label.
-
-        Public so a second, run-button-less view (ui/simulation_tab.py's
-        embedded preview) can mirror a solve driven by this instance's
-        RocketSimThread without owning a thread of its own.
-        """
+        """Plot an already-solved result and update the status label."""
         if self.view is not None and self.ideal_line is not None:
             pts = np.column_stack([result["x"], result["y"], result["z"]]).astype(np.float32)
             self.ideal_line.setData(pos=pts)
@@ -898,7 +892,7 @@ class Trajectory3DView(QWidget):
         )
 
     def set_error(self, message):
-        """Show a solve failure — see set_ideal_result's docstring."""
+        """Show a solve failure in the status label."""
         self.status_lbl.setText(f"Simulation error: {message}")
 
     def _unavailable_label(self, message):
