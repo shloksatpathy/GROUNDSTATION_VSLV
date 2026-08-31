@@ -182,7 +182,12 @@ class Attitude3DView(QWidget):
             layout.addLayout(btn_row)
 
         self.setLayout(layout)
-        self.setMinimumHeight(340)
+        # Floor, not a target: the panel takes stretch=1 in the dashboard's
+        # side column, so it still gets most of the height whenever there is
+        # height to give. Kept low so the dashboard as a whole can shrink to
+        # fit a short laptop screen instead of forcing the window taller than
+        # the display (see main.py's resize clamp).
+        self.setMinimumHeight(240)
         self.setStyleSheet("background:#1A1A1A; border:1px solid #333; border-radius:6px;")
 
     # -----------------------------------
@@ -191,7 +196,7 @@ class Attitude3DView(QWidget):
     def _build_scene(self, model_path):
         self.view = gl.GLViewWidget()
         self.view.setBackgroundColor("#0E0E0E")
-        self.view.setMinimumHeight(240)
+        self.view.setMinimumHeight(160)
         # The panel stylesheet would otherwise paint a border over the GL canvas.
         self.view.setStyleSheet("border:none;")
         self.reset_view()

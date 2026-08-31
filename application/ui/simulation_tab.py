@@ -38,16 +38,6 @@ class SimulationTab(QWidget):
             warn.setStyleSheet("color:#FFB300; font-weight:bold;")
             layout.addWidget(warn)
 
-        self.editor = QTextEdit()
-        self.editor.setStyleSheet(
-            "font-family: monospace; font-size: 13px; background: #1E1E1E; color: #E0E0E0;"
-        )
-        layout.addWidget(self.editor)
-
-        self.status_lbl = QLabel("")
-        self.status_lbl.setStyleSheet("color:#E0E0E0; font-size:12px;")
-        layout.addWidget(self.status_lbl)
-
         btn_layout = QHBoxLayout()
         self.load_button = QPushButton("Reload from File")
         self.save_button = QPushButton("Save")
@@ -63,6 +53,19 @@ class SimulationTab(QWidget):
         btn_layout.addWidget(self.save_button)
         btn_layout.addWidget(self.run_button)
         layout.addLayout(btn_layout)
+
+        self.status_lbl = QLabel("")
+        self.status_lbl.setStyleSheet("color:#E0E0E0; font-size:12px;")
+        layout.addWidget(self.status_lbl)
+
+        # Buttons and status sit ABOVE the editor, which is the one widget
+        # that stretches. Below it they were the first thing pushed off a
+        # short screen, so Save looked like it was missing entirely.
+        self.editor = QTextEdit()
+        self.editor.setStyleSheet(
+            "font-family: monospace; font-size: 13px; background: #1E1E1E; color: #E0E0E0;"
+        )
+        layout.addWidget(self.editor)
 
         self.setLayout(layout)
 

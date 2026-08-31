@@ -100,7 +100,7 @@ class MapTab(QWidget):
 
         # Right pane: reference + current position + geodesic line.
         self.map2_view = QWebEngineView()
-        self.map2_view.setMinimumHeight(400)
+        self.map2_view.setMinimumHeight(220)
 
         panes_layout.addWidget(self.trajectory_view)
         panes_layout.addWidget(self.map2_view)

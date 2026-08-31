@@ -40,8 +40,11 @@ class PacketEditorTab(QWidget):
         btn_layout.addWidget(self.add_field_button)
         btn_layout.addWidget(self.save_button)
         
-        layout.addWidget(self.editor)
+        # Buttons above the editor: the editor is the one widget that
+        # stretches, so anything below it is the first thing squeezed off a
+        # short screen. Matches ui/simulation_tab.py.
         layout.addLayout(btn_layout)
+        layout.addWidget(self.editor)
         
         self.setLayout(layout)
         

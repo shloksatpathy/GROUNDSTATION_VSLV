@@ -483,9 +483,18 @@ class Trajectory3DView(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(6)
 
+        # Header row: title on the left, the action buttons on the right. The
+        # buttons used to sit in a row at the very bottom of the panel, below
+        # the status/legend/hint/attribution labels — the first thing to be
+        # cut off on a short screen. Anchored to the top they stay reachable
+        # however cramped the window gets. Populated further down, once the
+        # GL scene has been built and we know whether Reset View applies.
+        header_row = QHBoxLayout()
         title = QLabel("TRAJECTORY — IDEAL vs LIVE")
         title.setStyleSheet("color:#E0E0E0; font-size:13px; font-weight:bold; letter-spacing:1px;")
-        layout.addWidget(title)
+        header_row.addWidget(title)
+        header_row.addStretch()
+        layout.addLayout(header_row)
 
         self.view = None
         self.ideal_line = None
@@ -557,14 +566,17 @@ class Trajectory3DView(QWidget):
             attribution.setStyleSheet("font-size:9px;")
             layout.addWidget(attribution)
 
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
         self.run_btn = QPushButton("Run Simulation")
+        self.run_btn.setStyleSheet("padding: 6px 12px; background-color: #0078D7; font-weight: bold;")
+        self.run_btn.setToolTip(
+            "Solve the RocketPy trajectory from config/rocket_config.json\n"
+            "and plot it here — edit those parameters on the Simulation Setup tab."
+        )
         if not ROCKETPY_AVAILABLE:
             self.run_btn.setEnabled(False)
             self.run_btn.setToolTip(f"rocketpy not installed ({ROCKETPY_IMPORT_ERROR})")
         self.run_btn.clicked.connect(self.run_simulation)
-        btn_row.addWidget(self.run_btn)
+        header_row.addWidget(self.run_btn)
         if self.view is not None:
             reset_view_btn = QPushButton("Reset View")
             reset_view_btn.setToolTip(
@@ -572,12 +584,13 @@ class Trajectory3DView(QWidget):
                 "Drag to orbit, scroll to zoom, Ctrl+drag (or middle-drag) to pan the map"
             )
             reset_view_btn.clicked.connect(self.reset_view)
-            btn_row.addWidget(reset_view_btn)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
+            header_row.addWidget(reset_view_btn)
 
         self.setLayout(layout)
-        self.setMinimumHeight(420)
+        # Floor, not a target — the GL view carries the layout's stretch, so
+        # it still takes all the spare height. Kept low so the Map tab fits a
+        # short screen (see main.py's window sizing).
+        self.setMinimumHeight(260)
         self.setStyleSheet("background:#1A1A1A; border:1px solid #333; border-radius:6px;")
 
     # -----------------------------------
@@ -586,7 +599,7 @@ class Trajectory3DView(QWidget):
     def _build_scene(self):
         self.view = gl.GLViewWidget()
         self.view.setBackgroundColor("#0E0E0E")
-        self.view.setMinimumHeight(340)
+        self.view.setMinimumHeight(180)
         # The panel stylesheet would otherwise paint a border over the GL canvas.
         self.view.setStyleSheet("border:none;")
         self.reset_view()

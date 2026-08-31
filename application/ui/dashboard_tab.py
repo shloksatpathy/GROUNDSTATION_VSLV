@@ -148,7 +148,10 @@ class DashboardTab(QWidget):
 
         side_widget = QWidget()
         side_widget.setLayout(side_layout)
-        side_widget.setMinimumWidth(320)
+        # Comfortable width, requested via the size hint; the hard floor is
+        # low so a narrow screen scrolls (see main.py's _scrollable) or
+        # squeezes rather than forcing the window wider than the display.
+        side_widget.setMinimumWidth(220)
         middle_layout.addWidget(side_widget, stretch=1)
 
         layout.addLayout(middle_layout)
@@ -156,7 +159,9 @@ class DashboardTab(QWidget):
         # ---- Bottom: Data Table ----
         self.table = QTableWidget()
         self.table_columns = []
-        self.table.setMinimumHeight(160)
+        # Low floor for the same reason as Attitude3DView's — the table's
+        # 192 px size hint still wins whenever the window has room.
+        self.table.setMinimumHeight(110)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
