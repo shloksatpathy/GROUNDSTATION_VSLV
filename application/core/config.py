@@ -118,11 +118,26 @@ _DEFAULTS = {
     # ground no longer being to the same scale as the trajectory beside it.
     "terrain_exaggeration": 1.0,
     # Optional {s}/{z}/{x}/{y} tile URL draped over the relief for map context
-    # (water, roads, built-up areas). Left off by default because the obvious
-    # free sources now watermark keyless requests — set it to a tile endpoint
-    # you have rights to, e.g.
-    #   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?api_key=..."
-    "terrain_basemap_url": None
+    # (water, roads, built-up areas). Left off by default — the relief reads
+    # more clearly without it. Any keyless endpoint works, e.g. the same Esri
+    # canvas the 2D map uses:
+    #   "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+    # Avoid CARTO's basemaps.cartocdn.com without an api_key= parameter: they
+    # return tiles stamped "API KEY REQUIRED" rather than an HTTP error.
+    "terrain_basemap_url": None,
+
+    # --- 2D reference map (map tab, right pane) ---
+    # Tile source for the folium map. Esri's Dark Gray Canvas needs no API
+    # key and matches the dark UI. Swap in any {z}/{x}/{y} endpoint you have
+    # rights to — a CARTO url must carry "?api_key=..." or its tiles come
+    # back watermarked.
+    "map_tile_url": (
+        "https://server.arcgisonline.com/ArcGIS/rest/services/"
+        "Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+    ),
+    # Attribution shown in the map corner. Required by most tile providers'
+    # terms — keep it in step with whatever "map_tile_url" points at.
+    "map_tile_attribution": "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
 }
 
 

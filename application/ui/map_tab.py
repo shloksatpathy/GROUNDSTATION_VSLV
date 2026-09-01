@@ -89,6 +89,12 @@ class MapTab(QWidget):
         self.ref_lon = cfg.get("ref_lon", 84.305725)
         self.ref_alt = cfg.get("ref_alt", 0.0)
 
+        # Tile source for the folium map below. Read from config so a keyed
+        # provider can be swapped in without touching this file; see
+        # core/config.py for why the default is Esri rather than CARTO.
+        self.tile_url = cfg.get("map_tile_url")
+        self.tile_attribution = cfg.get("map_tile_attribution")
+
         layout = QVBoxLayout()
 
         layout.addLayout(self._build_manual_fix_row())
@@ -278,7 +284,12 @@ class MapTab(QWidget):
             else:
                 center = [(self.ref_lat + gnss_lat)/2.0, (self.ref_lon + gnss_lon)/2.0]
 
-            m2 = folium.Map(location=center, zoom_start=10, tiles="CartoDB dark_matter")
+            m2 = folium.Map(
+                location=center,
+                zoom_start=10,
+                tiles=self.tile_url,
+                attr=self.tile_attribution,
+            )
 
             # reference marker (distinct)
             folium.Marker(
