@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                              QScrollArea, QFrame)
 from PyQt5.QtGui import QIcon, QPalette, QColor
 
+from ui.auth_dialog import require_authorization
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.packet_editor_tab import PacketEditorTab
@@ -203,6 +204,9 @@ def main():
     set_application_attributes()
     app = QApplication(sys.argv)
     apply_dark_theme(app)
+
+    if not require_authorization():
+        sys.exit(0)
 
     window = GroundStation()
     window.show()

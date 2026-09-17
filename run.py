@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import QApplication
 
 # Imported before QApplication is constructed — QtWebEngine requires this.
 from main import GroundStation, apply_dark_theme, set_application_attributes
+from ui.auth_dialog import require_authorization
 
 
 def main():
@@ -24,6 +25,10 @@ def main():
     set_application_attributes()
     app = QApplication(sys.argv)
     apply_dark_theme(app)
+
+    if not require_authorization():
+        sys.exit(0)
+
     window = GroundStation()
     window.show()
     sys.exit(app.exec_())
