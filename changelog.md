@@ -239,9 +239,58 @@ view was added, and the whole thing is now shipped as a standalone executable.
 
 ---
 
+## [v3.0.0] – RocketPy Trajectory Simulation & 3D Mapping
+
+Adds a full pre-flight trajectory simulator built on RocketPy, and reworks the
+map tab into a live 3D mission view with real basemap terrain.
+
+### Added — Simulation
+- RocketPy integration for 3D trajectory estimation (`core/rocket_sim.py`)
+- Simulation Setup tab: a JSON editor for the RocketPy rocket/motor/environment
+  configuration (`config/rocket_config.json`), with a Save and Run Simulation
+  button reporting apogee, max speed, or the error inline
+- Simulated ("ideal") trajectory rendered in the map tab's 3D view alongside
+  live telemetry
+
+### Added — 3D Trajectory View
+- `Trajectory3DView` (`ui/trajectory_3d.py`) replaces the old static 2D map as
+  the map tab's primary pane, with orbit/zoom and a documented Ctrl+drag /
+  middle-drag pan gesture
+- Real basemap terrain: stitched dark-tile imagery fetched on a background
+  thread, tiles loaded in parallel, and reloaded dynamically as the camera
+  pans and zooms
+- Trajectory footprint sizing raised from a 5km to a 50km half-extent, with
+  the camera auto-framing the whole simulated trajectory on completion
+- Manual lat/lon/alt entry above the map panes — plot a one-off fix, or move
+  the 3D view's reference origin for launch sites that differ from
+  `config.json` (terrain and traces re-fetch around the new origin)
+
+### Fixed
+- Trajectory and pad markers no longer disappear behind the terrain plane
+  (depth-testing was implicitly disabled by pyqtgraph's default blend mode)
+- Window no longer overflows a short display, hiding each tab's bottom control
+  row — sizing now derives from the screen's work area, high-DPI scaling is
+  enabled, and every tab scrolls instead of clipping below its minimum size
+
+### Changed
+- Simulation Setup tab is now purely the config editor; the ideal-vs-live
+  trajectory preview lives only on the map tab
+- Map tab reduced to two panes now that the 3D view carries both the terrain
+  and the trajectory
+
+### Impact
+- Flight trajectories can be modeled and checked against the field before
+  launch, not just reconstructed from telemetry afterward
+- The map tab reads as one live mission view — terrain, planned trajectory,
+  and live GNSS together — instead of a flat 2D reference map
+- The UI lays out correctly on small/high-DPI displays instead of hiding
+  action buttons off-screen
+
+---
+
 # 🚀 Upcoming (Planned)
 
-## [v2.2.0] – Advanced Telemetry
+## [v3.1.0] – Advanced Telemetry
 - Anomaly detection
 - Telemetry replay mode
 
