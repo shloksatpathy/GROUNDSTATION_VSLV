@@ -7,7 +7,7 @@ parses it against a configurable packet schema, filters and enriches it, and
 presents it as live plots, a 3D attitude view, 2D/3D maps, and an adaptive CSV
 log — with an optional RocketPy-backed "ideal trajectory" to fly against.
 
-<sub>Team ID `2024ASI-CANSAT0032` · Version `2.1.0` · Python ≥ 3.8</sub>
+<sub>Team ID `2024ASI-CANSAT0032` · Version `3.0.0` · Python ≥ 3.8</sub>
 
 ![Telemetry dashboard](images/WhatsApp%20Image%202026-03-04%20at%207.24.46%20AM.jpeg)
 
@@ -90,7 +90,13 @@ python run.py
 ```
 
 `run.py` is the entry point — it wires up high-DPI scaling and the dark theme
-before creating the Qt application, then launches the four-tab window.
+before creating the Qt application, shows a short authorization prompt, then
+launches the four-tab window.
+
+> **Authorization code:** the app asks for a 4-character code before the main
+> window opens (`VSLV`, defined in `application/ui/auth_dialog.py`). Wrong codes
+> re-prompt; **Exit** quits cleanly. This is a deliberate "are you supposed to
+> be here" checkpoint on shared field laptops, not a security boundary.
 
 > **Serial port in use?** Close the Arduino IDE Serial Monitor (or any other
 > program holding the port) before connecting.
@@ -251,6 +257,7 @@ GROUNDSTATION_VSLV/
 │   │   ├── data_recorder.py   # Adaptive CSV logging
 │   │   └── rocket_sim.py      # RocketPy integration (optional, guarded import)
 │   └── ui/
+│       ├── auth_dialog.py     # Startup authorization prompt
 │       ├── dashboard_tab.py   # Serial + recording + plots + info + table
 │       ├── map_tab.py         # Manual fix, geodesic 2D map, 3D trajectory host
 │       ├── trajectory_3d.py   # 3D ENU scene, shaded-relief terrain, live/ideal traces
@@ -278,7 +285,7 @@ Full description in [`STRUCTURE.md`](STRUCTURE.md).
 - **Single simulation thread owner** — the Simulation Setup tab reuses the Map tab's `Trajectory3DView` rather than spawning a second `RocketSimThread`.
 - **Graceful degradation** — `pyqtgraph.opengl`, `rocketpy`, and `requests`/`Pillow` are all guarded imports. Missing OpenGL → numeric-only 3D panels; missing RocketPy → disabled simulation; no network → trajectory over a blank background.
 - **Frozen vs source paths** — `core/config.py` resolves read-only resources from the bundle but reads/writes user data (config edits, CSVs) beside the executable.
-- **Two entry points in step** — `run.py` and `application/main.py` share `set_application_attributes()` and `apply_dark_theme()` so high-DPI and theme setup can't drift.
+- **Two entry points in step** — `run.py` and `application/main.py` share `set_application_attributes()`, `apply_dark_theme()`, and `require_authorization()` so high-DPI, theme, and the startup gate can't drift.
 
 The full version-by-version history is in [`changelog.md`](changelog.md).
 
