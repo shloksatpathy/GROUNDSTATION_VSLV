@@ -3,6 +3,7 @@ import math
 import folium
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QDoubleSpinBox, QPushButton, QCheckBox)
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 from core.config import load_config
@@ -80,6 +81,10 @@ def latlon_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
 
 
 class MapTab(QWidget):
+
+    # (lat, lon, alt) — the operator moved the reference point. The admin
+    # relays this so monitors draw in the same local frame.
+    reference_changed = pyqtSignal(float, float, float)
 
     def __init__(self):
         super().__init__()
@@ -219,9 +224,14 @@ class MapTab(QWidget):
     def set_manual_reference(self):
         """Move the reference point — the origin of the 3D local frame and the
         flag on the 2D map — to the typed coordinates."""
-        self.ref_lat = self.lat_input.value()
-        self.ref_lon = self.lon_input.value()
-        self.ref_alt = self.alt_input.value()
+        self.set_reference(self.lat_input.value(), self.lon_input.value(),
+                           self.alt_input.value())
+        self.reference_changed.emit(self.ref_lat, self.ref_lon, self.ref_alt)
+
+    def set_reference(self, lat, lon, alt):
+        """Move the reference point — from the inputs, or from the admin's
+        relay on a monitor."""
+        self.ref_lat, self.ref_lon, self.ref_alt = lat, lon, alt
 
         # Clears the live trace and reloads terrain around the new origin:
         # points already plotted are ENU meters from the old one.
