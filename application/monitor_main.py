@@ -6,15 +6,13 @@ admin's relay (core/relay.py) instead of a radio. There is no serial link,
 command line, recorder, simulation runner or config editor here — those
 stay with the admin station.
 """
-import sys
+from PyQt5.QtWidgets import QMessageBox
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
-
-from main import StationWindow, apply_dark_theme, set_application_attributes
+from main import StationWindow
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.monitor_join_dialog import join_relay
-from core.relay import RelayClient, sim_result_from_wire
+from core.relay import sim_result_from_wire
 
 _TITLE = "VSSSIC Ground Station V3 — Monitor"
 
@@ -39,6 +37,7 @@ class MonitorStation(StationWindow):
         client.simulation_received.connect(self._show_simulation)
         client.reset_received.connect(self.dashboard.reset_views)
         client.link_changed.connect(self._show_link)
+        client.paused_changed.connect(self._show_paused)
         client.joined.connect(self._show_joined)
         client.denied.connect(self._on_revoked)
 
@@ -58,6 +57,13 @@ class MonitorStation(StationWindow):
             self._set_status(f"Receiving from {self.client.station}", "lightgreen")
         else:
             self._set_status(f"No data from {self.client.station} — link lost", "orange")
+
+    def _show_paused(self, paused):
+        if paused:
+            self._set_status(f"{self.client.station} has paused the feed — holding last data",
+                             "orange")
+        else:
+            self._show_link(True)
 
     def _show_simulation(self, wire):
         try:
@@ -83,18 +89,9 @@ class MonitorStation(StationWindow):
 
 
 def main():
-    """Monitor entry point. Kept in sync with monitor.py."""
-    set_application_attributes()
-    app = QApplication(sys.argv)
-    apply_dark_theme(app)
-
-    client = RelayClient()
-    if not join_relay(client):
-        sys.exit(0)
-
-    window = MonitorStation(client)
-    window.show()
-    sys.exit(app.exec_())
+    """Monitor-only entry point (monitor.py): skips the mode chooser."""
+    from launcher import main as launch
+    launch("monitor")
 
 
 if __name__ == "__main__":

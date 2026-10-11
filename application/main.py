@@ -147,7 +147,7 @@ class GroundStation(StationWindow):
         # Shares self.map_tab.trajectory_view's RocketSimThread rather than
         # owning a second one — see ui/simulation_tab.py.
         self.simulation_tab = SimulationTab(self.map_tab.trajectory_view)
-        self.relay_tab = RelayTab()
+        self.relay_tab = RelayTab(self.parser)
 
         # Each page goes in a scroll area so that a screen too small for the
         # page's minimum size scrolls rather than silently clipping whatever
@@ -159,7 +159,7 @@ class GroundStation(StationWindow):
         self.tabs.addTab(self._scrollable(self.map_tab), "Map & Tracking")
         self.tabs.addTab(self._scrollable(self.simulation_tab), "Simulation Setup")
         self.tabs.addTab(self._scrollable(self.packet_editor), "Packet Format")
-        self.tabs.addTab(self._scrollable(self.relay_tab), "Monitor Relay")
+        self.tabs.addTab(self._scrollable(self.relay_tab), "Monitor Settings")
 
         # Everything a monitor needs to mirror this station goes through the
         # relay; see core/relay.py for the protocol.
@@ -224,17 +224,8 @@ def apply_dark_theme(app):
 
 def main():
     """Console/GUI entry point. Kept in sync with run.py."""
-    set_application_attributes()
-    app = QApplication(sys.argv)
-    apply_dark_theme(app)
-
-    if not require_authorization():
-        sys.exit(0)
-
-    window = GroundStation()
-    window.show()
-
-    sys.exit(app.exec_())
+    from launcher import main as launch
+    launch()
 
 
 if __name__ == "__main__":

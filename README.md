@@ -16,7 +16,8 @@ log — with an optional RocketPy-backed "ideal trajectory" to fly against.
 ## Table of contents
 
 - [Highlights](#highlights)
-- [The four tabs](#the-four-tabs)
+- [The tabs](#the-tabs)
+- [Monitor mode](#monitor-mode)
 - [Quick start (from source)](#quick-start-from-source)
 - [Telemetry input format](#telemetry-input-format)
 - [Configuration](#configuration)
@@ -43,13 +44,16 @@ log — with an optional RocketPy-backed "ideal trajectory" to fly against.
 | **3D attitude** | Vehicle CAD model + body/reference triads driven by live roll/pitch/yaw. Falls back to a numeric readout if OpenGL is unavailable. |
 | **Mapping** | Manual or telemetry-driven position, geodesic (great-circle) line to a reference point, Haversine range readout, configurable dark tile provider. |
 | **3D trajectory** | Live GNSS + altimeter trace and the RocketPy "ideal" trajectory in one local ENU scene, over shaded-relief terrain that reloads as you pan and zoom. |
+| **Monitor mode** | Read-only copies of the station on the LAN (`monitor.py`), joined with a separate access code. The admin controls who may join and exactly which data they see. |
 | **Adaptive logging** | Persistent CSV handle, periodic flush, automatic column expansion mid-flight, `TIMESTAMP` injection. |
 | **Resilience** | Optional heavy dependencies (`rocketpy`, OpenGL, tile imagery) degrade gracefully — a driver or network problem on the field laptop never takes the dashboard down. |
 | **Packaging** | One-file PyInstaller build with the mission icon embedded; seeds an editable `config/` and `data/` beside the executable on first run. |
 
 ---
 
-## The four tabs
+## The tabs
+
+The admin station has five tabs; the read-only [monitor](#monitor-mode) shows only the first two.
 
 ### 1. Telemetry Dashboard
 - **Serial panel** — COM port dropdown (auto-refreshed), baud selector, Connect / Disconnect, live connection status.
@@ -72,6 +76,37 @@ log — with an optional RocketPy-backed "ideal trajectory" to fly against.
 
 ### 4. Packet Format
 - Edit `config/packet_format.json` — delimiter and field list — and apply it to the **live** parsing pipeline without restarting.
+
+### 5. Monitor Settings
+Admin-side controls for [monitor mode](#monitor-mode). Edits take effect on **Apply & Save** and are written to `config.json`.
+- **Authentication & access** — relay on/off, station name, UDP port, monitor code, a **max monitors** cap, an **allowed hosts** IP list, and a live table of connected monitors with a per-row **Remove** (which also blocks that host until **Clear removed hosts**).
+- **Data shown to monitors** — toggles for vehicle position (GNSS lat/lon), the launch reference point and the simulated trajectory; a send-rate cap in packets/s; and a checklist of packet fields to hide.
+- **Pause feed** — freezes every monitor on its last data (not saved across restarts).
+
+---
+
+## Monitor mode
+
+A monitor is a view-only copy of the station for teammates on the same network. It shows the Telemetry Dashboard and Map & Tracking tabs, fed by the admin instead of a radio, and has no serial link, command line, recorder, simulation runner or config editor.
+
+The same app (and the same packaged executable) runs both roles. At launch it asks **Host station** or **Monitor**:
+
+```bash
+python run.py              # asks which role; "Remember my choice" skips it next time
+python run.py --monitor    # force monitor mode (overrides a remembered choice)
+python run.py --host       # force host mode
+python monitor.py          # shortcut for --monitor
+```
+
+A remembered choice is stored as `launch_mode` in `config.json`; delete that key (or pass a flag) to be asked again.
+
+1. On the admin, open **Monitor Settings** and set a **monitor code** (4+ characters). It is separate from the admin startup code, so view access never grants control.
+2. On the monitor, pick the station from the discovered list (or type its IP and port, default UDP `5600`) and enter the code.
+3. The monitor receives every processed (parsed and Kalman-filtered) packet, plus the launch reference and ideal trajectory.
+
+Changing the code or removing a host disconnects the affected monitors within a couple of seconds; a restarted admin picks its monitors back up without them rejoining. Visibility rules are applied on the admin, so a modified monitor cannot request more than it is allowed. Protocol details are in `application/core/relay.py`.
+
+> **Not a security boundary.** Like the startup gate, the code is an access checkpoint: the code and the telemetry cross the LAN in plaintext over UDP. Use it on a network you trust.
 
 ---
 
@@ -163,6 +198,16 @@ The processor probes common aliases for each role, so field names like
 | `terrain_basemap_url` | Optional `{z}/{x}/{y}` imagery draped over the relief | `null` |
 | `map_tile_url` | Tile source for the 2D map | Esri Dark Gray Canvas |
 | `map_tile_attribution` | Attribution string for `map_tile_url` | Esri |
+| `launch_mode` | Remembered startup role: `"host"` or `"monitor"` (unset = ask) | unset |
+| `relay_enabled` | Relay telemetry to monitors | `true` |
+| `relay_port` | UDP port monitors join on (LAN discovery beacons use fixed UDP `5601`) | `5600` |
+| `monitor_code` | Code monitors enter to join | `VIEW` |
+| `station_name` | Name monitors see | `VSLV Ground Station` |
+| `relay_max_monitors` | Maximum simultaneous monitors (`0` = unlimited) | `0` |
+| `relay_allowed_hosts` | IPs allowed to join (empty = any) | `[]` |
+| `relay_hidden_fields` | Packet fields stripped before sending | `[]` |
+| `relay_share_position` / `relay_share_reference` / `relay_share_simulation` | What monitors are shown | `true` |
+| `relay_max_rate_hz` | Packets/s sent to monitors (`0` = all) | `0` |
 
 > **Tile providers:** the defaults use Esri's keyless Dark Gray Canvas. If you
 > swap in a CARTO endpoint it must carry `?api_key=…` or the tiles come back
@@ -246,8 +291,11 @@ Cross-platform builds must be made **on** the target platform. See
 ```
 GROUNDSTATION_VSLV/
 ├── run.py                     # Entry point — python run.py
+├── monitor.py                 # Shortcut that starts straight in monitor mode
 ├── application/
 │   ├── main.py                # QMainWindow, tabs, dark theme, window fitting
+│   ├── launcher.py            # Startup: host-or-monitor choice, then launch
+│   ├── monitor_main.py        # Read-only monitor window
 │   ├── core/
 │   │   ├── config.py          # Cached JSON config + frozen-build path resolution
 │   │   ├── serial_manager.py  # Threaded serial reader, port discovery, TX
@@ -255,9 +303,11 @@ GROUNDSTATION_VSLV/
 │   │   ├── telemetry_processor.py  # Kalman filter, vspeed, flight state, battery %
 │   │   ├── data_buffer.py     # In-memory rolling buffers for plotting
 │   │   ├── data_recorder.py   # Adaptive CSV logging
-│   │   └── rocket_sim.py      # RocketPy integration (optional, guarded import)
+│   │   ├── rocket_sim.py      # RocketPy integration (optional, guarded import)
+│   │   └── relay.py           # UDP relay: admin server, monitor client, discovery
 │   └── ui/
-│       ├── auth_dialog.py     # Startup authorization prompt
+│       ├── mode_dialog.py     # Startup host-or-monitor chooser
+│       ├── auth_dialog.py     # Startup authorization prompt (host mode)
 │       ├── dashboard_tab.py   # Serial + recording + plots + info + table
 │       ├── map_tab.py         # Manual fix, geodesic 2D map, 3D trajectory host
 │       ├── trajectory_3d.py   # 3D ENU scene, shaded-relief terrain, live/ideal traces
@@ -265,6 +315,8 @@ GROUNDSTATION_VSLV/
 │       ├── mesh_loader.py     # Dependency-free STL/OBJ loader
 │       ├── simulation_tab.py  # rocket_config.json editor + run controls
 │       ├── packet_editor_tab.py  # Live packet-schema editor
+│       ├── relay_tab.py       # Monitor Settings: access + data-display controls
+│       ├── monitor_join_dialog.py  # Monitor startup: pick station, enter code
 │       └── plots.py           # PyQtGraph plot widgets
 ├── config/                    # config.json, packet_format.json, rocket_config.json, motors/
 ├── models/                    # vehicle.stl (+ conventions README)
@@ -285,7 +337,8 @@ Full description in [`STRUCTURE.md`](STRUCTURE.md).
 - **Single simulation thread owner** — the Simulation Setup tab reuses the Map tab's `Trajectory3DView` rather than spawning a second `RocketSimThread`.
 - **Graceful degradation** — `pyqtgraph.opengl`, `rocketpy`, and `requests`/`Pillow` are all guarded imports. Missing OpenGL → numeric-only 3D panels; missing RocketPy → disabled simulation; no network → trajectory over a blank background.
 - **Frozen vs source paths** — `core/config.py` resolves read-only resources from the bundle but reads/writes user data (config edits, CSVs) beside the executable.
-- **Two entry points in step** — `run.py` and `application/main.py` share `set_application_attributes()`, `apply_dark_theme()`, and `require_authorization()` so high-DPI, theme, and the startup gate can't drift.
+- **Admin-side enforcement** — the relay filters what each monitor receives (hidden fields, position, reference, simulation, rate) and who may join, so monitors are trusted with nothing. `DashboardTab` runs in read-only mode on a monitor, fed through `ingest()` instead of a serial line.
+- **Entry points in step** — `run.py`, `application/main.py` and `monitor.py` all go through `launcher.main()`, so high-DPI setup, theme, the mode chooser and the startup gate can't drift.
 
 The full version-by-version history is in [`changelog.md`](changelog.md).
 

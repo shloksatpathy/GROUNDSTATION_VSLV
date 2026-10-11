@@ -16,7 +16,13 @@ Protocol: one JSON object per UDP datagram, discriminated by "type".
                     ref      {"lat", "lon", "alt"} launch reference moved
                     sim      {"result"}            new simulated trajectory
                     reset    {}                    admin restarted recording
+                    status   {"paused"}            admin froze / resumed the feed
   admin -> LAN      beacon   {"station", "port"}   broadcast for discovery
+
+What a monitor may see is decided here, not on the monitor: hidden fields are
+stripped from each packet, and the reference / simulation / position can be
+withheld, so a modified monitor build cannot ask for more. Joins can also be
+refused by host allowlist, ban, or monitor cap (see RelayServer.set_policy).
 
 Because the heartbeat re-sends the code, changing the code on the admin
 revokes every monitor still holding the old one within one heartbeat, and a
@@ -46,6 +52,18 @@ BEACON_MS = 2000
 # Simulated trajectories run to thousands of samples; a UDP datagram tops out
 # just under 64 KB. Decimating keeps the "sim" message to one datagram.
 _SIM_MAX_POINTS = 600
+
+
+# Packet keys that locate the vehicle; withheld when position sharing is off.
+POSITION_KEYS = frozenset({
+    "GNSS_LAT", "lat", "LAT", "latitude",
+    "GNSS_LON", "lon", "LON", "longitude",
+})
+
+
+def _bare_host(host):
+    """Peer address without the IPv4-mapped IPv6 prefix Qt adds."""
+    return host.replace("::ffff:", "")
 
 
 def _encode(msg_type, **fields):
@@ -114,7 +132,19 @@ class RelayServer(QObject):
 
         self._sock = None
         self._beacon_sock = None
-        self._subscribers = {}  # (QHostAddress str, port) -> last-seen time
+        self._subscribers = {}  # (QHostAddress str, port) -> {"seen", "since"}
+        self._banned = set()    # bare hosts removed by the admin, until unbanned
+
+        # Display / access policy, set from the admin's Monitor Settings tab.
+        self.max_monitors = 0           # 0 = unlimited
+        self.allowed_hosts = frozenset()  # empty = any host may join
+        self.hidden_fields = frozenset()
+        self.share_position = True
+        self.share_reference = True
+        self.share_simulation = True
+        self.max_rate_hz = 0.0          # 0 = every packet
+        self.paused = False
+        self._last_pkt_time = 0.0
         self._seq = 0
         # Replayed in each welcome so a monitor that joins mid-session gets
         # the same reference frame and ideal trajectory as the admin.
@@ -122,7 +152,7 @@ class RelayServer(QObject):
         self._sim_wire = None
 
         self._sweep_timer = QTimer(self)
-        self._sweep_timer.timeout.connect(self._drop_stale)
+        self._sweep_timer.timeout.connect(self._sweep)
         self._beacon_timer = QTimer(self)
         self._beacon_timer.timeout.connect(self._send_beacon)
 
@@ -169,14 +199,70 @@ class RelayServer(QObject):
         their next heartbeat, in _on_ready_read."""
         self.code = code
 
+    def set_policy(self, *, max_monitors, allowed_hosts, hidden_fields, share_position,
+                   share_reference, share_simulation, max_rate_hz):
+        """Replace the access/display policy. Takes effect on the next packet;
+        monitors already joined but no longer permitted are removed now."""
+        self.max_monitors = max(0, int(max_monitors))
+        self.allowed_hosts = frozenset(allowed_hosts)
+        self.hidden_fields = frozenset(hidden_fields)
+        self.share_position = bool(share_position)
+        newly_ref = share_reference and not self.share_reference
+        newly_sim = share_simulation and not self.share_simulation
+        self.share_reference = bool(share_reference)
+        self.share_simulation = bool(share_simulation)
+        self.max_rate_hz = max(0.0, float(max_rate_hz))
+
+        if self.allowed_hosts:
+            for key in [k for k in self._subscribers
+                        if _bare_host(k[0]) not in self.allowed_hosts]:
+                self._remove(key, "This host is no longer allowed by the admin station.")
+        # Turning sharing on should not wait for the admin to move the
+        # reference or rerun the solver.
+        if newly_ref and self._ref is not None:
+            self._broadcast(_encode("ref", **self._ref))
+        if newly_sim and self._sim_wire is not None:
+            self._broadcast(_encode("sim", result=self._sim_wire))
+
+    def set_paused(self, paused):
+        """Freeze the feed: monitors keep their last view and are told why."""
+        self.paused = bool(paused)
+        self._broadcast(_encode("status", paused=self.paused))
+
+    def kick(self, key):
+        """Remove one monitor and refuse its host until unbanned."""
+        if key in self._subscribers:
+            self._banned.add(_bare_host(key[0]))
+            self._remove(key, "Removed by the admin station.")
+
+    def unban(self, host):
+        self._banned.discard(host)
+
+    def banned_hosts(self):
+        return sorted(self._banned)
+
+    def subscriber_info(self):
+        """[(key, "host:port", seconds connected)] for the settings tab."""
+        now = time.monotonic()
+        return [(k, f"{_bare_host(k[0])}:{k[1]}", now - v["since"])
+                for k, v in self._subscribers.items()]
+
     # -----------------------------------
     # Publishing (called from the admin UI)
     # -----------------------------------
     def publish_packet(self, enriched):
-        if not self._subscribers:
+        if not self._subscribers or self.paused:
             return
-        self._seq += 1
-        data = {k: _json_safe(v) for k, v in enriched.items()}
+        if self.max_rate_hz > 0:
+            now = time.monotonic()
+            if now - self._last_pkt_time < 1.0 / self.max_rate_hz:
+                return
+            self._last_pkt_time = now
+        self._seq += 1  # only sent packets count, so throttling isn't "loss"
+        hidden = self.hidden_fields
+        if not self.share_position:
+            hidden = hidden | POSITION_KEYS
+        data = {k: _json_safe(v) for k, v in enriched.items() if k not in hidden}
         try:
             payload = _encode("pkt", seq=self._seq, data=data)
         except ValueError as e:
@@ -188,11 +274,13 @@ class RelayServer(QObject):
 
     def publish_reference(self, lat, lon, alt):
         self._ref = {"lat": lat, "lon": lon, "alt": alt}
-        self._broadcast(_encode("ref", **self._ref))
+        if self.share_reference:
+            self._broadcast(_encode("ref", **self._ref))
 
     def publish_simulation(self, result):
         self._sim_wire = sim_result_to_wire(result)
-        self._broadcast(_encode("sim", result=self._sim_wire))
+        if self.share_simulation:
+            self._broadcast(_encode("sim", result=self._sim_wire))
 
     def publish_reset(self):
         self._broadcast(_encode("reset"))
@@ -215,33 +303,61 @@ class RelayServer(QObject):
                 continue
 
             key = (host.toString(), port)
+            bare = _bare_host(key[0])
+            known = key in self._subscribers
+
             if str(msg.get("code", "")).strip().upper() != self.code.strip().upper():
-                self._sock.writeDatagram(
-                    _encode("denied", reason="Incorrect monitor access code."), host, port)
+                reason = "Incorrect monitor access code."
+            elif bare in self._banned:
+                reason = "This host was removed by the admin station."
+            elif self.allowed_hosts and bare not in self.allowed_hosts:
+                reason = "This host is not on the admin station's allowed list."
+            elif (not known and self.max_monitors
+                  and len(self._subscribers) >= self.max_monitors):
+                reason = "The admin station has reached its monitor limit."
+            else:
+                reason = None
+
+            if reason is not None:
+                self._sock.writeDatagram(_encode("denied", reason=reason), host, port)
                 if self._subscribers.pop(key, None) is not None:
                     self._emit_subscribers()
                 continue
 
-            is_new = key not in self._subscribers
-            self._subscribers[key] = time.monotonic()
-            if is_new:
+            now = time.monotonic()
+            if known:
+                self._subscribers[key]["seen"] = now
+            else:
+                self._subscribers[key] = {"seen": now, "since": now}
                 self._sock.writeDatagram(
-                    _encode("welcome", station=self.station_name,
-                            ref=self._ref, sim=self._sim_wire),
+                    _encode("welcome", station=self.station_name, paused=self.paused,
+                            ref=self._ref if self.share_reference else None,
+                            sim=self._sim_wire if self.share_simulation else None),
                     host, port)
                 self._emit_subscribers()
 
-    def _drop_stale(self):
+    def _remove(self, key, reason):
+        """Tell a monitor it is out (best effort), then forget it."""
+        if self._sock is not None:
+            self._sock.writeDatagram(_encode("denied", reason=reason),
+                                     QHostAddress(key[0]), key[1])
+        if self._subscribers.pop(key, None) is not None:
+            self._emit_subscribers()
+
+    def _sweep(self):
         cutoff = time.monotonic() - SUBSCRIBER_TIMEOUT_S
-        stale = [k for k, seen in self._subscribers.items() if seen < cutoff]
+        stale = [k for k, v in self._subscribers.items() if v["seen"] < cutoff]
         for k in stale:
             del self._subscribers[k]
         if stale:
             self._emit_subscribers()
+        if self.paused:
+            # No packets flow while paused; keep the monitors' link alive.
+            self._broadcast(_encode("status", paused=True))
 
     def _emit_subscribers(self):
         self.subscribers_changed.emit(
-            [f"{h.replace('::ffff:', '')}:{p}" for h, p in self._subscribers])
+            [f"{_bare_host(h)}:{p}" for h, p in self._subscribers])
 
     def _send_beacon(self):
         if self._beacon_sock is None:
@@ -261,6 +377,7 @@ class RelayClient(QObject):
     simulation_received = pyqtSignal(dict)
     reset_received = pyqtSignal()
     link_changed = pyqtSignal(bool)     # True while datagrams keep arriving
+    paused_changed = pyqtSignal(bool)   # admin froze / resumed the feed
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -282,6 +399,7 @@ class RelayClient(QObject):
         self._last_rx = None
         self._last_seq = None
         self._link_up = False
+        self._paused = False
         self._heartbeat = QTimer(self)
         self._heartbeat.timeout.connect(self._send_join)
         self._watchdog = QTimer(self)
@@ -329,6 +447,7 @@ class RelayClient(QObject):
     def _dispatch(self, msg):
         kind = msg["type"]
         if kind == "pkt":
+            self._set_paused(False)  # a lost "resume" status must not stick
             seq = msg.get("seq")
             if isinstance(seq, int):
                 if self._last_seq is not None and seq > self._last_seq + 1:
@@ -339,6 +458,7 @@ class RelayClient(QObject):
         elif kind == "welcome":
             self.station = msg.get("station") or "Ground Station"
             self.joined.emit(self.station)
+            self._set_paused(bool(msg.get("paused")))
             ref = msg.get("ref")
             if ref:
                 self._emit_reference(ref)
@@ -357,6 +477,13 @@ class RelayClient(QObject):
         elif kind == "reset":
             self._last_seq = None
             self.reset_received.emit()
+        elif kind == "status":
+            self._set_paused(bool(msg.get("paused")))
+
+    def _set_paused(self, paused):
+        if paused != self._paused:
+            self._paused = paused
+            self.paused_changed.emit(paused)
 
     def _emit_reference(self, ref):
         try:

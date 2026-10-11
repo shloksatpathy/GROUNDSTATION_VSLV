@@ -147,7 +147,16 @@ _DEFAULTS = {
     # admin code so handing out view access never hands out control.
     "monitor_code": "VIEW",
     # Name monitors see in their station list and title bar.
-    "station_name": "VSLV Ground Station"
+    "station_name": "VSLV Ground Station",
+    # Monitor Settings tab: who may join and what they are shown. All are
+    # enforced by the relay, so a modified monitor cannot override them.
+    "relay_max_monitors": 0,          # 0 = unlimited
+    "relay_allowed_hosts": [],        # empty = any host with the code
+    "relay_hidden_fields": [],        # packet keys stripped before sending
+    "relay_share_position": True,     # GNSS lat/lon in packets
+    "relay_share_reference": True,    # launch reference point
+    "relay_share_simulation": True,   # ideal trajectory
+    "relay_max_rate_hz": 0            # packets/s to monitors, 0 = all
 }
 
 

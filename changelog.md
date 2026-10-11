@@ -288,9 +288,51 @@ map tab into a live 3D mission view with real basemap terrain.
 
 ---
 
+## [v3.1.0] – Monitor Mode
+
+Adds read-only monitor stations that mirror the admin ground station over the
+LAN, with admin-side control over who may join and what they see.
+
+### Added — Monitor
+- `monitor.py` / `monitor_main.py`: a view-only station showing the Telemetry
+  Dashboard and Map & Tracking tabs, with no serial link, command line,
+  recorder, simulation runner or config editor
+- Join dialog with LAN discovery (UDP beacon) or manual host/port, and a
+  monitor access code separate from the admin startup code
+- Monitors show link-lost, access-revoked and feed-paused states
+- Startup mode chooser (`ui/mode_dialog.py`, `launcher.py`): one build, one
+  executable, asks **Host station** or **Monitor** at launch, with an optional
+  remembered choice (`launch_mode`) and `--host` / `--monitor` flags; the host
+  path keeps the authorization gate
+
+### Added — Admin relay (`core/relay.py`)
+- UDP relay that forwards each processed packet, the launch reference and the
+  simulated trajectory; heartbeat-based joins so a changed code revokes old
+  monitors and a restarted admin recovers its monitors automatically
+- **Monitor Settings tab** (`ui/relay_tab.py`):
+  - access: relay on/off, station name, port, monitor code, max monitors,
+    allowed-host list, live monitor table with per-monitor Remove
+  - display: toggle position, launch reference and simulated trajectory;
+    per-field hiding; send-rate cap; pause/resume feed
+- New `config.json` keys: `relay_*`, `monitor_code`, `station_name`
+
+### Changed
+- `DashboardTab` supports a read-only mode and exposes `ingest()`,
+  `reset_views()` and `packet_processed` / `views_reset` signals
+- `MapTab` gains `set_reference()` and a `reference_changed` signal
+- `main.py` window chrome split into a shared `StationWindow`
+- `run.py`, `main.py` and `monitor.py` now share one launcher
+
+### Impact
+- Teammates can watch a flight from other machines without touching the
+  vehicle link, and the operator decides exactly what each sees
+- Visibility is enforced on the admin, not trusted to the monitor build
+
+---
+
 # 🚀 Upcoming (Planned)
 
-## [v3.1.0] – Advanced Telemetry
+## [v3.2.0] – Advanced Telemetry
 - Anomaly detection
 - Telemetry replay mode
 
