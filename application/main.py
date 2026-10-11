@@ -9,6 +9,7 @@ from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.packet_editor_tab import PacketEditorTab
 from ui.simulation_tab import SimulationTab
+from ui.relay_tab import RelayTab
 from core.serial_manager import SerialManager
 from core.packet_parser import PacketParser
 
@@ -35,12 +36,14 @@ def set_application_attributes():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
 
-class GroundStation(QMainWindow):
+class StationWindow(QMainWindow):
+    """Window chrome shared by the admin GCS and the read-only monitor
+    (monitor_main.py): screen-fitted sizing, icon, scrollable tab pages."""
 
-    def __init__(self):
+    def __init__(self, title):
         super().__init__()
 
-        self.setWindowTitle("VSSSIC Ground Station V3")
+        self.setWindowTitle(title)
 
         # Size from the screen's work area rather than a fixed 1500x950. That
         # constant overflowed anything shorter than ~1000 px, and the part that
@@ -70,32 +73,7 @@ class GroundStation(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        # Shared Core Instances
-        self.serial = SerialManager()
-        self.parser = PacketParser()
-
-        # Tabs
         self.tabs = QTabWidget()
-
-        # Map tab is passed to Dashboard to allow it to push GNSS updates
-        self.map_tab = MapTab()
-        self.dashboard = DashboardTab(self.serial, self.map_tab, self.parser)
-        self.packet_editor = PacketEditorTab(self.parser)
-        # Shares self.map_tab.trajectory_view's RocketSimThread rather than
-        # owning a second one — see ui/simulation_tab.py.
-        self.simulation_tab = SimulationTab(self.map_tab.trajectory_view)
-
-        # Each page goes in a scroll area so that a screen too small for the
-        # page's minimum size scrolls rather than silently clipping whatever
-        # sits at the edges. With widgetResizable(True) this is invisible
-        # whenever the window has room: the page is stretched to the viewport
-        # exactly as it would be if it were the tab's direct child, and the
-        # scrollbars only appear once the viewport drops below its minimum.
-        self.tabs.addTab(self._scrollable(self.dashboard), "Telemetry Dashboard")
-        self.tabs.addTab(self._scrollable(self.map_tab), "Map & Tracking")
-        self.tabs.addTab(self._scrollable(self.simulation_tab), "Simulation Setup")
-        self.tabs.addTab(self._scrollable(self.packet_editor), "Packet Format")
-
         self.setCentralWidget(self.tabs)
 
     @staticmethod
@@ -150,6 +128,47 @@ class GroundStation(QMainWindow):
             frame.moveTop(max(avail.top(), min(frame.top(), avail.bottom() - frame.height() + 1)))
             self.move(frame.topLeft())
 
+
+class GroundStation(StationWindow):
+    """Admin/control GCS: owns the radio link, records, commands, and
+    relays telemetry to monitors."""
+
+    def __init__(self):
+        super().__init__("VSSSIC Ground Station V3")
+
+        # Shared Core Instances
+        self.serial = SerialManager()
+        self.parser = PacketParser()
+
+        # Map tab is passed to Dashboard to allow it to push GNSS updates
+        self.map_tab = MapTab()
+        self.dashboard = DashboardTab(self.serial, self.map_tab, self.parser)
+        self.packet_editor = PacketEditorTab(self.parser)
+        # Shares self.map_tab.trajectory_view's RocketSimThread rather than
+        # owning a second one — see ui/simulation_tab.py.
+        self.simulation_tab = SimulationTab(self.map_tab.trajectory_view)
+        self.relay_tab = RelayTab(self.parser)
+
+        # Each page goes in a scroll area so that a screen too small for the
+        # page's minimum size scrolls rather than silently clipping whatever
+        # sits at the edges. With widgetResizable(True) this is invisible
+        # whenever the window has room: the page is stretched to the viewport
+        # exactly as it would be if it were the tab's direct child, and the
+        # scrollbars only appear once the viewport drops below its minimum.
+        self.tabs.addTab(self._scrollable(self.dashboard), "Telemetry Dashboard")
+        self.tabs.addTab(self._scrollable(self.map_tab), "Map & Tracking")
+        self.tabs.addTab(self._scrollable(self.simulation_tab), "Simulation Setup")
+        self.tabs.addTab(self._scrollable(self.packet_editor), "Packet Format")
+        self.tabs.addTab(self._scrollable(self.relay_tab), "Monitor Settings")
+
+        # Everything a monitor needs to mirror this station goes through the
+        # relay; see core/relay.py for the protocol.
+        relay = self.relay_tab.relay
+        self.dashboard.packet_processed.connect(relay.publish_packet)
+        self.dashboard.views_reset.connect(relay.publish_reset)
+        self.map_tab.reference_changed.connect(relay.publish_reference)
+        self.map_tab.trajectory_view.simulation_complete.connect(relay.publish_simulation)
+
     def closeEvent(self, event):
         """Clean shutdown of threads and file handles before exit."""
         print("[SHUTDOWN] Closing connections and file handles...")
@@ -158,6 +177,10 @@ class GroundStation(QMainWindow):
         except Exception as e:
             print(f"[SHUTDOWN] Error stopping recording: {e}")
 
+        try:
+            self.relay_tab.shutdown()
+        except Exception as e:
+            print(f"[SHUTDOWN] Error stopping relay: {e}")
 
         try:
             self.serial.disconnect()
@@ -201,17 +224,8 @@ def apply_dark_theme(app):
 
 def main():
     """Console/GUI entry point. Kept in sync with run.py."""
-    set_application_attributes()
-    app = QApplication(sys.argv)
-    apply_dark_theme(app)
-
-    if not require_authorization():
-        sys.exit(0)
-
-    window = GroundStation()
-    window.show()
-
-    sys.exit(app.exec_())
+    from launcher import main as launch
+    launch()
 
 
 if __name__ == "__main__":

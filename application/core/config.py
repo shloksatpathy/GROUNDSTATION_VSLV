@@ -137,7 +137,26 @@ _DEFAULTS = {
     ),
     # Attribution shown in the map corner. Required by most tile providers'
     # terms — keep it in step with whatever "map_tile_url" points at.
-    "map_tile_attribution": "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+    "map_tile_attribution": "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+
+    # --- Monitor relay (admin -> read-only monitors, see core/relay.py) ---
+    "relay_enabled": True,
+    "relay_port": 5600,
+    # Code a monitor must enter to receive telemetry. Set from the admin's
+    # Monitor Relay tab; deliberately different from ui/auth_dialog.py's
+    # admin code so handing out view access never hands out control.
+    "monitor_code": "VIEW",
+    # Name monitors see in their station list and title bar.
+    "station_name": "VSLV Ground Station",
+    # Monitor Settings tab: who may join and what they are shown. All are
+    # enforced by the relay, so a modified monitor cannot override them.
+    "relay_max_monitors": 0,          # 0 = unlimited
+    "relay_allowed_hosts": [],        # empty = any host with the code
+    "relay_hidden_fields": [],        # packet keys stripped before sending
+    "relay_share_position": True,     # GNSS lat/lon in packets
+    "relay_share_reference": True,    # launch reference point
+    "relay_share_simulation": True,   # ideal trajectory
+    "relay_max_rate_hz": 0            # packets/s to monitors, 0 = all
 }
 
 
@@ -199,6 +218,30 @@ def load_rocket_config(force_reload=False):
         _rocket_config_cache = None
 
     return _rocket_config_cache
+
+
+def save_config_values(updates):
+    """Persist the given keys into config.json, leaving every other key as
+    the operator wrote it, and refresh the cache. Raises on write failure."""
+    global _config_cache
+
+    config_file = resolve_path(os.path.join("config", "config.json"))
+    try:
+        with open(config_file, "r") as f:
+            user_config = json.load(f)
+    except FileNotFoundError:
+        user_config = {}
+
+    user_config.update(updates)
+    parent = os.path.dirname(config_file)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(config_file, "w") as f:
+        json.dump(user_config, f, indent=2)
+        f.write("\n")
+
+    if _config_cache is not None:
+        _config_cache.update(updates)
 
 
 def get(key, default=None):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 VSSSIC Ground Station V3 - Entry Point
-Launches the modular ground station application.
+Asks whether to run as the host station or a read-only monitor, then launches.
 """
 import sys
 import os
@@ -11,27 +11,8 @@ import os
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'application'))
 
-from PyQt5.QtWidgets import QApplication
-
 # Imported before QApplication is constructed — QtWebEngine requires this.
-from main import GroundStation, apply_dark_theme, set_application_attributes
-from ui.auth_dialog import require_authorization
-
-
-def main():
-    # Shared with application/main.py's main() so the two entry points can't
-    # drift — high-DPI scaling in particular has to be set before the
-    # QApplication exists or it is silently ignored.
-    set_application_attributes()
-    app = QApplication(sys.argv)
-    apply_dark_theme(app)
-
-    if not require_authorization():
-        sys.exit(0)
-
-    window = GroundStation()
-    window.show()
-    sys.exit(app.exec_())
+from launcher import main
 
 
 if __name__ == "__main__":

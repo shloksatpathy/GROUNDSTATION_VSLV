@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                                QComboBox, QLabel, QLineEdit, QSizePolicy,
                                QTableWidget, QTableWidgetItem)
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, pyqtSignal
 
 from ui.plots import PlotManager
 from ui.map_tab import MapTab
@@ -13,6 +13,19 @@ from core.data_recorder import DataRecorder
 from core.telemetry_processor import TelemetryProcessor
 
 class DashboardTab(QWidget):
+    """Live telemetry view.
+
+    With a SerialManager this is the admin dashboard: it owns the link,
+    parses and filters each line, records, and sends commands. With
+    serial_manager=None it is the monitor's read-only view — no link, no
+    recorder, no command line — and is fed already-enriched packets through
+    ingest() by core/relay.RelayClient.
+    """
+
+    # Each fully processed packet, for the monitor relay to forward.
+    packet_processed = pyqtSignal(dict)
+    # Recording restarted and the views were cleared.
+    views_reset = pyqtSignal()
 
     def __init__(self, serial_manager: SerialManager, map_tab: MapTab,
                  parser: PacketParser = None):
@@ -20,21 +33,44 @@ class DashboardTab(QWidget):
 
         # ----- Core Systems -----
         self.serial = serial_manager
-        # Shared with PacketEditorTab so schema edits apply to the live pipeline
-        self.parser = parser if parser is not None else PacketParser()
+        self.read_only = serial_manager is None
         self.buffer = TelemetryBuffer()
-        self.recorder = DataRecorder()
-        self.processor = TelemetryProcessor()
         self.map_tab = map_tab
-        
-        # Connect threaded serial signal
-        self.serial.line_received.connect(self.on_serial_line)
         self.packet_count = 0
         # Full enriched packet — the buffer only keeps the plotted subset of keys
         self.latest_packet = None
 
         layout = QVBoxLayout()
 
+        if self.read_only:
+            # The admin already parsed, filtered and is recording these.
+            self.parser = self.recorder = self.processor = None
+            self.lbl_conn = QLabel("Not connected")
+            self.lbl_conn.setStyleSheet("color: orange; font-size: 12px; font-weight: bold;")
+            top_layout = QHBoxLayout()
+            top_layout.addWidget(QLabel("MONITOR — view only"))
+            top_layout.addWidget(self.lbl_conn)
+            top_layout.addStretch()
+            layout.addLayout(top_layout)
+        else:
+            # Shared with PacketEditorTab so schema edits apply to the live pipeline
+            self.parser = parser if parser is not None else PacketParser()
+            self.recorder = DataRecorder()
+            self.processor = TelemetryProcessor()
+            # Connect threaded serial signal
+            self.serial.line_received.connect(self.on_serial_line)
+            self._build_controls(layout)
+
+        self._build_views(layout)
+        self.setLayout(layout)
+
+        # ---- Timer for Plot Updates ----
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_gui)
+        self.timer.start(50)  # ~20 FPS
+
+    def _build_controls(self, layout):
+        """Serial link, recording and command rows — admin only."""
         # ---- Top Controls: Serial + Recording + Command ----
         top_layout = QHBoxLayout()
 
@@ -95,6 +131,8 @@ class DashboardTab(QWidget):
         self.send_btn.clicked.connect(self.send_command)
         self.cmd_edit.returnPressed.connect(self.send_command)
 
+    def _build_views(self, layout):
+        """Plots, info panel, 3D attitude and packet table — both modes."""
         # ---- Middle: Plots + Info Panel ----
         middle_layout = QHBoxLayout()
         
@@ -166,13 +204,6 @@ class DashboardTab(QWidget):
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
 
-        self.setLayout(layout)
-
-        # ---- Timer for Plot Updates ----
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_gui)
-        self.timer.start(50)  # ~20 FPS
-
     # -----------------------------------
     # Controls
     # -----------------------------------
@@ -204,22 +235,29 @@ class DashboardTab(QWidget):
 
     def start_recording(self):
         self.processor.reset()
-        self.buffer.clear()
-        self.packet_count = 0
-        self.table.setRowCount(0)
-        self.attitude_view.reset()
-        self.map_tab.reset()
+        self.reset_views()
+        self.views_reset.emit()
         try:
             self.recorder.start()
         except Exception as e:
             print(f"[RECORDER] Could not start recording: {e}")
+
+    def reset_views(self):
+        """Clear plots, table, attitude and live trace for a fresh flight."""
+        self.buffer.clear()
+        self.packet_count = 0
+        self.latest_packet = None
+        self.table.setRowCount(0)
+        self.attitude_view.reset()
+        self.map_tab.reset()
 
     def stop_recording(self):
         self.recorder.stop()
 
     def shutdown(self):
         """Flush and release the CSV handle on application exit."""
-        self.recorder.close()
+        if self.recorder is not None:
+            self.recorder.close()
 
 
     def send_command(self):
@@ -247,57 +285,65 @@ class DashboardTab(QWidget):
                 # Enqueue data processing and update logic
                 # (1) Apply Kalman Filter, battery %, state parsing
                 enriched = self.processor.process(packet)
-                self.latest_packet = enriched
 
-                # (2) Store in buffer for plotting
-                self.buffer.add_packet(enriched)
-                
-                # (3) Save to CSV if recording
+                # (2) Save to CSV if recording
                 self.recorder.record(enriched)
-                self.packet_count += 1
-                
-                # (4) Update Map Tab (every 20 packets to prevent stuttering)
-                if self.packet_count % 20 == 0:
-                    lat_key = next((k for k in ["GNSS_LAT", "lat", "LAT", "latitude"] if k in enriched), None)
-                    lon_key = next((k for k in ["GNSS_LON", "lon", "LON", "longitude"] if k in enriched), None)
 
-                    if lat_key and lon_key:
-                        lat, lon = enriched.get(lat_key), enriched.get(lon_key)
-                        if lat is not None and lon is not None:
-                            # Prefer the Kalman-filtered altitude; fall back to
-                            # the same raw keys TelemetryProcessor itself checks.
-                            alt = enriched.get("filtered_alt")
-                            if alt is None:
-                                alt_key = next(
-                                    (k for k in ["ALTITUDE_M", "altitude", "ALT", "alt"] if k in enriched),
-                                    None,
-                                )
-                                alt = enriched.get(alt_key) if alt_key else None
-                            try:
-                                alt = float(alt) if alt is not None else None
-                            except (TypeError, ValueError):
-                                alt = None
-
-                            self.map_tab.update_position(float(lat), float(lon), alt)
-                
-                # (5) Update data table dynamically
-                new_cols = [k for k in enriched.keys() if k not in self.table_columns]
-                if new_cols:
-                    self.table_columns += new_cols
-                    self.table.setColumnCount(len(self.table_columns))
-                    self.table.setHorizontalHeaderLabels(self.table_columns)
-                    
-                self.table.insertRow(0)
-                for j, col in enumerate(self.table_columns):
-                    val = enriched.get(col)
-                    val_str = "" if val is None else str(val)
-                    self.table.setItem(0, j, QTableWidgetItem(val_str))
-                    
-                if self.table.rowCount() > 10:
-                    self.table.removeRow(self.table.rowCount() - 1)
-                    
+                # (3) Display, then hand to the monitor relay
+                self.ingest(enriched)
+                self.packet_processed.emit(enriched)
         except Exception as e:
             print("Processing error on serial line:", e)
+
+    def ingest(self, enriched):
+        """Show one processed packet — the admin's own, or a relayed one."""
+        try:
+            self.latest_packet = enriched
+            self.buffer.add_packet(enriched)
+            self.packet_count += 1
+
+            # Update Map Tab (every 20 packets to prevent stuttering)
+            if self.packet_count % 20 == 0:
+                lat_key = next((k for k in ["GNSS_LAT", "lat", "LAT", "latitude"] if k in enriched), None)
+                lon_key = next((k for k in ["GNSS_LON", "lon", "LON", "longitude"] if k in enriched), None)
+
+                if lat_key and lon_key:
+                    lat, lon = enriched.get(lat_key), enriched.get(lon_key)
+                    if lat is not None and lon is not None:
+                        # Prefer the Kalman-filtered altitude; fall back to
+                        # the same raw keys TelemetryProcessor itself checks.
+                        alt = enriched.get("filtered_alt")
+                        if alt is None:
+                            alt_key = next(
+                                (k for k in ["ALTITUDE_M", "altitude", "ALT", "alt"] if k in enriched),
+                                None,
+                            )
+                            alt = enriched.get(alt_key) if alt_key else None
+                        try:
+                            alt = float(alt) if alt is not None else None
+                        except (TypeError, ValueError):
+                            alt = None
+
+                        self.map_tab.update_position(float(lat), float(lon), alt)
+            
+            # Update data table dynamically
+            new_cols = [k for k in enriched.keys() if k not in self.table_columns]
+            if new_cols:
+                self.table_columns += new_cols
+                self.table.setColumnCount(len(self.table_columns))
+                self.table.setHorizontalHeaderLabels(self.table_columns)
+                
+            self.table.insertRow(0)
+            for j, col in enumerate(self.table_columns):
+                val = enriched.get(col)
+                val_str = "" if val is None else str(val)
+                self.table.setItem(0, j, QTableWidgetItem(val_str))
+                
+            if self.table.rowCount() > 10:
+                self.table.removeRow(self.table.rowCount() - 1)
+                
+        except Exception as e:
+            print("Display error on packet:", e)
 
     # -----------------------------------
     # GUI Plot/Label Updates
