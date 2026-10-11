@@ -7,7 +7,7 @@ parses it against a configurable packet schema, filters and enriches it, and
 presents it as live plots, a 3D attitude view, 2D/3D maps, and an adaptive CSV
 log — with an optional RocketPy-backed "ideal trajectory" to fly against. The same app can also run as a view-only **monitor** that mirrors a host station over the LAN.
 
-<sub>Team ID `2024ASI-CANSAT0032` · Version `3.1.0` · Python ≥ 3.8</sub>
+<sub>Team ID `2024ASI-CANSAT0032` · Version `3.2.0` · Python ≥ 3.8</sub>
 
 ![Telemetry dashboard](images/WhatsApp%20Image%202026-03-04%20at%207.24.46%20AM.jpeg)
 

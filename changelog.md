@@ -288,7 +288,7 @@ map tab into a live 3D mission view with real basemap terrain.
 
 ---
 
-## [v3.1.0] – Monitor Mode
+## [v3.2.0] – Monitor Mode
 
 Adds read-only monitor stations that mirror the admin ground station over the
 LAN, with admin-side control over who may join and what they see.
@@ -332,7 +332,7 @@ LAN, with admin-side control over who may join and what they see.
 
 # 🚀 Upcoming (Planned)
 
-## [v3.2.0] – Advanced Telemetry
+## [v3.3.0] – Advanced Telemetry
 - Anomaly detection
 - Telemetry replay mode
 
