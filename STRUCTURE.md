@@ -7,12 +7,15 @@ This document describes the organization of the VSSSIC Ground Station V3 applica
 ```
 GROUNDSTATION_VSLV/
 ├── application/              # Main modular application
-│   ├── main.py              # Entry point (run from project root via run.py)
+│   ├── main.py              # Window chrome + host station (run from project root via run.py)
+│   ├── launcher.py          # Startup: host-or-monitor choice, then launch
+│   ├── monitor_main.py      # Read-only monitor window (monitor.py starts here directly)
 │   ├── core/                # Core functionality modules
 │   │   ├── config.py        # Configuration loader
 │   │   ├── data_buffer.py   # Telemetry data buffering
 │   │   ├── data_recorder.py # CSV logging system
 │   │   ├── packet_parser.py # Telemetry packet parsing
+│   │   ├── relay.py         # UDP relay: host server, monitor client, LAN discovery
 │   │   ├── serial_manager.py # Serial communication
 │   │   └── telemetry_processor.py # Data processing pipeline
 │   └── ui/                  # PyQt5 UI components
@@ -20,7 +23,10 @@ GROUNDSTATION_VSLV/
 │       ├── dashboard_tab.py # Main telemetry dashboard
 │       ├── map_tab.py       # Map & tracking UI
 │       ├── mesh_loader.py   # STL/OBJ model loading for the 3D view
+│       ├── mode_dialog.py   # Startup host-or-monitor chooser
+│       ├── monitor_join_dialog.py # Monitor startup: pick station, enter code
 │       ├── packet_editor_tab.py # Packet format editor
+│       ├── relay_tab.py     # Monitor Settings: access + data-display controls
 │       └── plots.py         # Plotting utilities
 │
 ├── config/                  # Configuration files

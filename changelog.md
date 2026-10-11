@@ -346,5 +346,6 @@ The project evolved from a basic telemetry display tool into a configurable, rea
 - Geospatial intelligence
 - Performance monitoring
 - Adaptive data logging
+- Read-only monitor stations with host-controlled access and data visibility
 
 This changelog documents the architectural and functional progression across development stages.

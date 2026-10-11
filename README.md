@@ -5,9 +5,9 @@
 A modular PyQt5 desktop application that ingests a live serial telemetry stream,
 parses it against a configurable packet schema, filters and enriches it, and
 presents it as live plots, a 3D attitude view, 2D/3D maps, and an adaptive CSV
-log — with an optional RocketPy-backed "ideal trajectory" to fly against.
+log — with an optional RocketPy-backed "ideal trajectory" to fly against. The same app can also run as a view-only **monitor** that mirrors a host station over the LAN.
 
-<sub>Team ID `2024ASI-CANSAT0032` · Version `3.0.0` · Python ≥ 3.8</sub>
+<sub>Team ID `2024ASI-CANSAT0032` · Version `3.1.0` · Python ≥ 3.8</sub>
 
 ![Telemetry dashboard](images/WhatsApp%20Image%202026-03-04%20at%207.24.46%20AM.jpeg)
 
@@ -271,7 +271,7 @@ build.bat           # Windows
 pyinstaller build.spec   # any OS, manual
 ```
 
-Output: `dist/VSSSIC_Ground_Station` (`.exe` on Windows), with
+The one executable serves both roles — it asks **Host station** or **Monitor** at launch (see [Monitor mode](#monitor-mode)), so teammates only need the same file. Output: `dist/VSSSIC_Ground_Station` (`.exe` on Windows), with
 `images/vsssic-logo-1.ico` embedded and the console kept attached so a
 failed launch isn't silent.
 
