@@ -6,8 +6,10 @@ The mode comes from, in order: an explicit argument (monitor.py), a
 finally the chooser dialog. run.py, main.py and monitor.py all end up here so
 they cannot drift.
 """
+import os
 import sys
 
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
 from main import (GroundStation, apply_dark_theme, set_application_attributes)
@@ -15,7 +17,7 @@ from monitor_main import MonitorStation
 from ui.auth_dialog import require_authorization
 from ui.mode_dialog import choose_mode, HOST, MONITOR
 from ui.monitor_join_dialog import join_relay
-from core.config import load_config, save_config_values
+from core.config import RESOURCE_ROOT, load_config, save_config_values
 from core.relay import RelayClient
 
 
@@ -33,7 +35,14 @@ def _resolve_mode(argv):
 def main(mode=None):
     # Must precede QApplication: high-DPI scaling is ignored otherwise.
     set_application_attributes()
+    if sys.platform == "win32":
+        # Without its own AppUserModelID Windows groups the taskbar button
+        # under python/the bootloader and shows its icon instead of ours.
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VSSSIC.GroundStation")
     app = QApplication(sys.argv)
+    # Application-wide, so the chooser, auth and join dialogs get it too.
+    app.setWindowIcon(QIcon(os.path.join(RESOURCE_ROOT, "images", "vsssic-logo-1.ico")))
     apply_dark_theme(app)
 
     remember = False

@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                              QScrollArea, QFrame)
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtGui import QPalette, QColor
 
 from ui.auth_dialog import require_authorization
 from ui.dashboard_tab import DashboardTab
@@ -62,16 +62,6 @@ class StationWindow(QMainWindow):
                         min(_PREFERRED_SIZE[1], int(avail.height() * 0.92)))
         else:
             self.resize(*_PREFERRED_SIZE)
-
-        # Load icon from project root
-        import os
-        icon_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "images",
-            "vsssic-logo-1.ico"
-        )
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
 
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
