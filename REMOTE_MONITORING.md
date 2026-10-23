@@ -170,49 +170,90 @@ Effort: about 1–2 weeks including deployment and testing.
 
 ---
 
-## Option D — No internet at the host: satellite messaging
+## Option D — Long-range radio relay (no internet, 30–40 km)
 
-For launch sites with no mobile coverage or internet, the host can push
-telemetry out over a satellite link instead.
+For launch sites with no internet or mobile coverage, the host can
+re-broadcast telemetry over a second radio to monitors that each have a
+matching radio, 30–40 km away.
 
-### GNSS modules can't send data
+### A second radio on its own port
 
-A GNSS receiver (GPS, NavIC, Galileo, GLONASS) only **receives** timing
-signals from the satellites; it has no transmitter, so it can't send
-packets. The vehicle's GNSS module stays what it is today: the source of
-position. Sending data needs a separate **satellite messaging modem** on the
-host.
+The host's existing receiver module stays dedicated to the vehicle link. The
+relay uses a **second radio module on its own USB-serial port** (another COM
+or `/dev/ttyUSB*` port). `SerialManager` in `core/serial_manager.py` already
+manages one port per object, so a second instance can drive the relay radio
+without touching the vehicle link.
 
-The one exception is **BeiDou**: besides positioning, it offers a two-way
-short-message service (RDSS). It needs a dedicated BeiDou messaging terminal
-and a service card, not an ordinary BeiDou receiver. Messages are short (tens
-of characters globally, longer over the Asia-Pacific region), and terminals
-and service are mainly sold in China. Practical only if the program operates
-there.
+Re-using the vehicle receiver is not an option:
 
-### Satellite messaging services
+- These radios are half-duplex. Every re-broadcast would take airtime from
+  the vehicle's downlink and could collide with its packets, so the flight
+  link would lose data.
+- The vehicle's own radio would hear the re-broadcasts, and the host already
+  sends commands to the vehicle over that port.
 
-| Service | Coverage | Message size | Typical latency | Hardware | Notes |
-|---|---|---|---|---|---|
-| **Iridium SBD** (e.g. RockBLOCK 9603) | Global, incl. poles and sea | 340 bytes up | ~5–30 s | Serial modem + antenna, needs clear sky | Pay per message; the most common choice for balloons, rockets and buoys |
-| **Iridium Certus / Garmin inReach** | Global | Short texts | ~seconds to minutes | Handheld or modem | Consumer-friendly, little control over the data format |
-| **Inmarsat (IsatData Pro)** | Global except poles | Few KB | ~seconds to a minute | Terminal | In India, Inmarsat services are offered through BSNL |
-| **Astrocast, Myriota, Lacuna** (satellite IoT) | Global, in passes | ~20–160 bytes | Minutes to hours | IoT modem | Too slow for live flight tracking; fine for "landed here" messages |
-| **Starlink** | Wide, where licensed | Full internet | ~50 ms | Dish + power | Gives real internet at the site; Options A–C then work unchanged. Not yet licensed everywhere (including India). |
+Keep the two links apart:
 
-**Regulation:** satellite phones and terminals are restricted in some
-countries. In India, using Iridium or Thuraya devices requires Department of
-Telecommunications permission; Inmarsat through BSNL is the licensed route.
-Check before buying hardware.
+- **Different band** where possible — e.g. vehicle on 433 MHz, relay on
+  865 MHz — otherwise at least a different channel and network ID (XBee PAN
+  ID, LoRa sync word).
+- **Antenna separation** — a 1 W relay transmitter next to the receiver can
+  drown out the weak vehicle signal. Mount the two antennas several metres
+  apart, ideally one above the other.
 
-### What fits through the link
+Use **plain LoRa, not LoRaWAN**: LoRaWAN routes through a gateway and a
+network server (e.g. The Things Network), which needs internet.
 
-Satellite messaging carries a **summary**, not the full stream. With Iridium
-SBD, a realistic rate is one message every 10–30 s, paid per message, so
-monitors would see a slow-updating position and status rather than live
-plots.
+### Range: line of sight decides, not power
 
-A packed binary summary fits in about 25 bytes:
+**Link budget is not the problem.** At 865 MHz over 35 km, free-space loss
+is about 122 dB. India's licence-free 865–867 MHz band allows 1 W (30 dBm)
+transmit power; with directional (Yagi) antennas of ~9 dBi at both ends the
+received signal is about −75 dBm, against LoRa receiver sensitivities of
+about −123 to −137 dBm. That is 50+ dB of margin, so even LoRa's faster
+settings work.
+
+**Height is the problem.** For a reliable 35 km link the straight line
+between the antennas has to clear the ground with margin:
+
+| At the midpoint of a 35 km path | 865 MHz |
+|---|---|
+| Earth's curvature (standard refraction) | ~18 m |
+| 60% of the first Fresnel zone (the clearance the beam needs) | ~33 m |
+| **Line of sight needed above the terrain** | **~40–50 m** |
+
+On flat ground that means two masts of 25 m or more. In practice, put one
+or both ends on a hill, a tall building or a tower. Without elevation,
+expect 5–15 km over flat ground.
+
+### Hardware
+
+| | Data rate | 30–40 km? | Encryption | Notes |
+|---|---|---|---|---|
+| **RFDesign RFD868x** (868 MHz variant of the RFD900x) | 64–250 kbps | Yes, with elevation and directional antennas | AES in firmware | Standard telemetry radio for drones and rockets; fast enough for the full packet stream. Confirm it can be set to 865–867 MHz for India. |
+| **LoRa at 1 W** (e.g. Ebyte E22-900T30, or SX1262 + amplifier) | ~1–5 kbps at long-range settings | Yes, with elevation | None; added in the app | Cheap; carries a packed summary at about 1 Hz, not the full stream |
+| **XBee 868 / 865LP** | 10–80 kbps | Borderline | AES-128 built in | Lower-power regional variants. The XBee-PRO 900HP's 45 km figure is for the US 902–928 MHz band, which isn't legal in India. |
+
+**Antennas**
+- **Host:** an omnidirectional collinear antenna (~6–9 dBi) on the highest
+  point available, so monitors in any direction can hear it.
+- **Monitors:** a Yagi pointed at the host.
+- **Repeater:** where a monitor has no line of sight to the host, a repeater
+  on a hill between them. DigiMesh and the RFD radios support relaying.
+
+**Regulation:** in India the licence-free band is 865–867 MHz, limited to
+1 W transmit power and 4 W EIRP. Check the limits for any other country.
+
+**Before buying,** run a terrain-based link calculation for the actual sites
+(Radio Mobile or HeyWhatsThat, both free), then do a range test at the real
+locations.
+
+### What goes over the air
+
+- **RFD868x / XBee:** the same `pkt`, `ref` and `status` JSON messages the
+  UDP relay sends, at a capped rate. `sim` goes as numbered chunks (see
+  Option B step 2), repeated now and then.
+- **LoRa:** a packed binary summary, about 25 bytes:
 
 | Field | Type | Bytes |
 |---|---|---|
@@ -225,84 +266,74 @@ A packed binary summary fits in about 25 bytes:
 | Battery (%) | uint8 | 1 |
 | Packet count since last summary | uint16 | 2 |
 
-The host's hidden-field and share-position settings apply before packing,
-so the satellite path follows the same visibility rules as the relay.
+  The launch reference goes out as its own small message every few seconds;
+  the simulated trajectory is too large for LoRa and isn't sent.
 
-### Where the messages land
+Either way, the host's hidden-field and share-position settings apply
+before anything is transmitted.
 
-The satellite provider delivers each message to the provider's cloud, which
-forwards it by HTTP webhook or email (RockBLOCK: an HTTP POST to a URL you
-choose). So the **monitors still need internet** — only the host is offline.
-That makes Option C's relay server the natural receiver: it gets the webhook,
-unpacks the summary and sends it to monitors as an ordinary `pkt` message.
-
-```
- Host GCS ──serial──► Iridium modem ──► satellite ──► provider cloud
-                                                          │ HTTP POST
- Monitor ◄──────────wss────────── Relay server (VPS) ◄────┘
-```
-
-Messages can also go the other way (provider → modem, 270 bytes on Iridium),
-which could carry pause/resume or kick commands later, but each one costs a
-message credit.
+**Access control changes.** Broadcast radio has no join handshake: the host
+can't see who is listening, so the allowlist, kicks and the monitor limit
+don't apply. Access comes down to encryption — whoever has the key can
+listen, and changing the key locks everyone else out.
 
 ### Implementation plan
 
-1. **Hardware** — a RockBLOCK 9603 (or similar Iridium SBD modem) on a USB
-   serial adapter, antenna with a clear view of the sky, and a RockBLOCK
-   account with line rental and credits.
-2. **`core/sat_uplink.py`** (new) — opens the modem with `pyserial` (already
-   a dependency) and sends with the standard AT commands: `AT+SBDWB` to load
-   the binary message, `AT+SBDIX` to transmit. Runs on a timer at the
-   configured interval and always sends the latest packet, never a backlog.
-3. **Summary packing** — `struct.pack` with the layout above, taking fields
-   from the same enriched packet the relay publishes, after hidden fields are
-   stripped.
-4. **Host settings** — a "Satellite uplink" box on the Monitor Settings tab:
-   on/off, serial port, send interval, and a running count of messages sent
-   (each one costs money). New `config.json` keys: `sat_enabled`, `sat_port`,
-   `sat_interval_s`.
-5. **Relay server** — a `/sat-webhook` endpoint on the Option C server that
-   checks the provider's credentials, unpacks the summary, and forwards it to
-   monitors as `pkt`.
-6. **Monitor UI** — label satellite packets ("via satellite, 18 s old") so
-   operators don't mistake a slow summary for a live feed.
-7. **Testing** — bench test with the modem outdoors; confirm delivery time
-   and per-message cost before relying on it in flight.
+1. **Hardware and site survey** — pick the radio (RFD868x if the full stream
+   is wanted, LoRa if a summary is enough), run the terrain calculation for
+   the real sites, and do a range test before writing code.
+2. **`core/radio_relay.py`** (new) — host side. Opens the relay radio's port
+   with `pyserial`, takes the same filtered packets `RelayServer` publishes,
+   and writes framed messages (start byte, length, CRC-16) at a capped rate.
+   For LoRa, packs the summary with `struct.pack`.
+3. **Encryption** — rely on the radio's AES where it has one (RFD, XBee);
+   for raw LoRa, encrypt each frame with AES-GCM using a key derived from
+   the monitor code (adds 28 bytes per frame).
+4. **Host settings** — a "Radio relay" box on the Monitor Settings tab:
+   on/off, serial port, baud rate, send rate, radio type. New `config.json`
+   keys: `radio_relay_enabled`, `radio_relay_port`, `radio_relay_baud`,
+   `radio_relay_rate_hz`, `radio_relay_kind`.
+5. **Monitor side** — a `RadioClient` that reads frames from the monitor's
+   own radio and emits the same signals as `RelayClient`
+   (`packet_received`, `reference_received`, ...), so the monitor window is
+   unchanged. The join dialog gets a "Radio" tab: serial port, baud rate and
+   key.
+6. **Monitor UI** — show the link as "via radio" with packet age and loss
+   from the sequence numbers; on LoRa, say that only the summary is shown.
+7. **Testing** — first on the bench with two radios, then with the vehicle
+   receiver running alongside to confirm the relay transmitter doesn't hurt
+   the downlink, then at the real sites.
 
-Effort: about 1 week after Option C exists, plus hardware lead time.
-Running cost: modem hardware, monthly line rental and per-message credits.
+Effort: about 1 week of code and testing, plus hardware lead time and field
+tests.
 
-### Offline alternatives without satellites
+### Nearby monitors: no extra radio needed
 
-If the monitors are near the launch site rather than far away, no internet
-or satellite link is needed at all:
+If the monitors are within a few hundred metres of the host:
 
-- **Field Wi-Fi hotspot** — the host laptop (or a portable router) creates a
+- **Field Wi-Fi hotspot** — the host laptop or a portable router creates a
   Wi-Fi network; monitors join it and use today's LAN mode, discovery
   included. Works with v3.2.0 as is.
-- **Long-range point-to-point Wi-Fi** — directional outdoor bridges extend
-  that LAN to a second site several kilometres away.
-- **Re-broadcast over radio** — a second LoRa or telemetry radio on the host
-  re-transmits the summary to monitors with their own receivers, kilometres
-  away, without any network.
+- **Point-to-point Wi-Fi bridges** — directional outdoor bridges extend that
+  LAN to a second site several kilometres away.
 
 ---
 
 ## Comparison
 
-| | A: VPN | B: Port forwarding | C: Cloud relay | D: Satellite |
+| | A: VPN | B: Port forwarding | C: Cloud relay | D: Radio relay |
 |---|---|---|---|---|
-| Code changes | None | Small | Large | Medium (needs C) |
+| Code changes | None | Small | Large | Medium |
 | Host needs internet | Yes | Yes | Yes | No |
 | Works behind carrier NAT | Yes | Only via IPv6 | Yes | n/a |
 | Router setup | No | Yes | No | No |
-| Extra install on monitors | VPN client | No | No | No |
-| Encrypted | Yes | No | Yes (TLS) | Provider link; TLS from server |
-| Data | Full stream | Full stream | Full stream | Summary every 10–30 s |
-| Running cost | Free tier | Free | Small VPS | Modem + per-message credits |
+| Extra install on monitors | VPN client | No | No | Radio + antenna |
+| Encrypted | Yes | No | Yes (TLS) | Radio AES or app-level AES |
+| Data | Full stream | Full stream | Full stream | Full stream (RFD) or ~1 Hz summary (LoRa) |
+| Range | Anywhere | Anywhere | Anywhere | 30–40 km with elevation |
+| Running cost | Free tier | Free | Small VPS | One-time hardware |
 | Host IP exposed | No | Yes | No | No |
-| Effort | ~1 hour | ~1–2 days | ~1–2 weeks | ~1 week after C |
+| Effort | ~1 hour | ~1–2 days | ~1–2 weeks | ~1 week + field tests |
 
 ---
 
@@ -318,6 +349,5 @@ or satellite link is needed at all:
    install a VPN, or if a browser-based viewer or server-side replay becomes a
    goal.
 4. **Sites with no internet:** if monitors are nearby, use a field Wi-Fi
-   hotspot with today's LAN mode. If they are far away, add **Option D**
-   (Iridium SBD summaries) on top of Option C, after checking local rules on
-   satellite terminals.
+   hotspot with today's LAN mode. Up to 30–40 km away, use **Option D** with a
+   second radio, after a terrain check and range test at the real sites.
