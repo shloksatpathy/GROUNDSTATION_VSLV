@@ -1,25 +1,29 @@
+import os
 import sys
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QShortcut, QFileDialog
+from PyQt5.QtGui import QIcon, QPalette, QColor, QKeySequence
 
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
 from ui.packet_editor_tab import PacketEditorTab
 from core.serial_manager import SerialManager
 from core.packet_parser import PacketParser
+from core.replay_source import ReplaySource
+from core.config import DATA_ROOT
 
 
 class GroundStation(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, replay_path=None):
         super().__init__()
 
         self.setWindowTitle("VSSSIC Ground Station V3")
+        if replay_path:
+            self.setWindowTitle(f"VSSSIC Ground Station V3 — REPLAY: {os.path.basename(replay_path)}")
         self.resize(1500, 950)
 
         # Load icon from project root
-        import os
         icon_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "images",
@@ -29,8 +33,11 @@ class GroundStation(QMainWindow):
             self.setWindowIcon(QIcon(icon_path))
 
         # Shared Core Instances
-        self.serial = SerialManager()
         self.parser = PacketParser()
+        if replay_path:
+            self.serial = ReplaySource(replay_path, self.parser)
+        else:
+            self.serial = SerialManager()
 
         # Tabs
         self.tabs = QTabWidget()
@@ -45,6 +52,21 @@ class GroundStation(QMainWindow):
         self.tabs.addTab(self.packet_editor, "Packet Format")
 
         self.setCentralWidget(self.tabs)
+
+        # Hidden replay: Ctrl+Alt+H opens a replica window fed from a CSV
+        self.replay_window = None
+        if not replay_path:
+            QShortcut(QKeySequence("Ctrl+Alt+H"), self, activated=self.open_replay)
+
+    def open_replay(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Replay telemetry CSV", DATA_ROOT, "CSV files (*.csv)")
+        if not path:
+            return
+        if self.replay_window:
+            self.replay_window.close()
+        self.replay_window = GroundStation(replay_path=path)
+        self.replay_window.show()
 
     def closeEvent(self, event):
         """Clean shutdown of threads and file handles before exit."""
