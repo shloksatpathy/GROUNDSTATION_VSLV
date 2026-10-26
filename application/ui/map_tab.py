@@ -53,6 +53,8 @@ def great_circle_points(lat1, lon1, lat2, lon2, n_points=100):
 
 class MapTab(QWidget):
 
+    LABEL_STYLE = "font-size:12px;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:6px;"
+
     def __init__(self):
         super().__init__()
 
@@ -78,73 +80,69 @@ class MapTab(QWidget):
         layout.addLayout(map_layout)
         self.setLayout(layout)
         
-        # Initialize with reference point
-        self.update_map(self.ref_lat, self.ref_lon)
-        self.update_ref_map(None, None)
+        self.build_maps()
+
+    def build_maps(self):
+        """Load both maps once. Fixes then move their layers via JavaScript,
+        so the pages never reload (no flicker, no tile refetch)."""
+        ref = [self.ref_lat, self.ref_lon]
+
+        # Primary single-point map
+        m = folium.Map(location=ref, zoom_start=15, tiles="CartoDB dark_matter")
+        pos = folium.CircleMarker(ref, radius=6, popup="Current Position").add_to(m)
+        self.map_js, self.pos_js = m.get_name(), pos.get_name()
+        self.map_view.setHtml(self._html(m))
+
+        # Second map: reference marker, GNSS marker, geodesic polyline, distance label.
+        # GNSS layers start invisible at the reference until the first fix.
+        m2 = folium.Map(location=ref, zoom_start=10, tiles="CartoDB dark_matter")
+        folium.Marker(
+            ref,
+            popup=f"Reference\n{self.ref_lat:.6f}, {self.ref_lon:.6f}",
+            tooltip="Reference Point",
+            icon=folium.Icon(color="blue", icon="flag")
+        ).add_to(m2)
+        gnss = folium.Marker(
+            ref,
+            popup="GNSS",
+            tooltip="GNSS Position",
+            icon=folium.Icon(color="lightgreen", icon="glyphicon-screenshot"),
+            opacity=0
+        ).add_to(m2)
+        line = folium.PolyLine([ref, ref], weight=3, opacity=0.9).add_to(m2)
+        label = folium.Marker(ref, icon=folium.DivIcon(html="")).add_to(m2)
+        self.map2_js, self.gnss_js = m2.get_name(), gnss.get_name()
+        self.line_js, self.label_js = line.get_name(), label.get_name()
+        self.map2_view.setHtml(self._html(m2))
+
+    @staticmethod
+    def _html(m):
+        data = io.BytesIO()
+        m.save(data, close_file=False)
+        return data.getvalue().decode()
 
     def update_position(self, lat, lon):
         """Called by dashboard when new coordinates arrive.
 
         Deliberately not named update() — that would shadow QWidget.update().
         """
-        self.update_map(lat, lon)
-        self.update_ref_map(lat, lon)
+        self.map_view.page().runJavaScript(
+            f"{self.pos_js}.setLatLng([{lat}, {lon}]); {self.map_js}.panTo([{lat}, {lon}]);"
+        )
 
-    def update_map(self, lat, lon):
-        """Primary single-point map (re-centered on GNSS or REF)."""
-        try:
-            m = folium.Map(location=[lat, lon], zoom_start=15, tiles="CartoDB dark_matter")
-            folium.CircleMarker([lat, lon], radius=6, popup="Current Position").add_to(m)
-            data = io.BytesIO()
-            m.save(data, close_file=False)
-            self.map_view.setHtml(data.getvalue().decode())
-        except Exception as e:
-            print(f"[MAP] update_map error: {e}")
+        line = great_circle_points(self.ref_lat, self.ref_lon, lat, lon, n_points=120)
+        dist_m = haversine_m(self.ref_lat, self.ref_lon, lat, lon)
+        dist_str = f"{dist_m/1000.0:.3f} km" if dist_m >= 1000 else f"{dist_m:.1f} m"
+        mid = line[len(line)//2]
+        center = [(self.ref_lat + lat)/2.0, (self.ref_lon + lon)/2.0]
 
-    def update_ref_map(self, gnss_lat, gnss_lon):
-        """Second map: reference marker, GNSS marker, geodesic polyline, distance label."""
-        try:
-            # center map halfway between points (or ref if GNSS missing)
-            if gnss_lat is None or gnss_lon is None:
-                center = [self.ref_lat, self.ref_lon]
-            else:
-                center = [(self.ref_lat + gnss_lat)/2.0, (self.ref_lon + gnss_lon)/2.0]
-
-            m2 = folium.Map(location=center, zoom_start=10, tiles="CartoDB dark_matter")
-
-            # reference marker (distinct)
-            folium.Marker(
-                [self.ref_lat, self.ref_lon],
-                popup=f"Reference\n{self.ref_lat:.6f}, {self.ref_lon:.6f}",
-                tooltip="Reference Point",
-                icon=folium.Icon(color="blue", icon="flag")
-            ).add_to(m2)
-
-            # if GNSS available add marker, geodesic polyline and midpoint distance label
-            if gnss_lat is not None and gnss_lon is not None:
-                folium.Marker(
-                    [gnss_lat, gnss_lon],
-                    popup=f"GNSS\n{gnss_lat:.6f}, {gnss_lon:.6f}",
-                    tooltip="GNSS Position",
-                    icon=folium.Icon(color="lightgreen", icon="glyphicon-screenshot")
-                ).add_to(m2)
-
-                # compute geodesic sampled points for a smooth curved line
-                line = great_circle_points(self.ref_lat, self.ref_lon, gnss_lat, gnss_lon, n_points=120)
-                folium.PolyLine(line, weight=3, opacity=0.9).add_to(m2)
-
-                # compute distance and add label at midpoint
-                dist_m = haversine_m(self.ref_lat, self.ref_lon, gnss_lat, gnss_lon)
-                dist_str = f"{dist_m/1000.0:.3f} km" if dist_m >= 1000 else f"{dist_m:.1f} m"
-                mid = line[len(line)//2]
-
-                folium.Marker(
-                    [mid[0], mid[1]],
-                    icon=folium.DivIcon(html=f"""<div style="font-size:12px;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:6px;">{dist_str}</div>""")
-                ).add_to(m2)
-
-            data = io.BytesIO()
-            m2.save(data, close_file=False)
-            self.map2_view.setHtml(data.getvalue().decode())
-        except Exception as e:
-            print(f"[MAP] update_ref_map error: {e}")
+        self.map2_view.page().runJavaScript(f"""
+            {self.gnss_js}.setLatLng([{lat}, {lon}]).setOpacity(1)
+                .setPopupContent("GNSS<br>{lat:.6f}, {lon:.6f}");
+            {self.line_js}.setLatLngs({line});
+            {self.label_js}.setLatLng({mid}).setIcon(L.divIcon({{
+                className: "empty",
+                html: '<div style="{self.LABEL_STYLE}">{dist_str}</div>'
+            }}));
+            {self.map2_js}.panTo({center});
+        """)

@@ -12,6 +12,7 @@ if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'application'))
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QSurfaceFormat
 from PyQt5.QtWidgets import QApplication
 
 # Imported before QApplication is constructed — QtWebEngine requires this.
@@ -20,6 +21,11 @@ from main import GroundStation, apply_dark_theme
 
 def main():
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    # No vsync: with the 3D view on screen every repaint is GL-composited, and
+    # waiting on vblank each time throttles the whole event loop (~6 FPS).
+    fmt = QSurfaceFormat.defaultFormat()
+    fmt.setSwapInterval(0)
+    QSurfaceFormat.setDefaultFormat(fmt)
     app = QApplication(sys.argv)
     apply_dark_theme(app)
     window = GroundStation()

@@ -250,15 +250,14 @@ class DashboardTab(QWidget):
                 self.recorder.record(enriched)
                 self.packet_count += 1
                 
-                # (4) Update Map Tab (every 20 packets to prevent stuttering)
-                if self.packet_count % 20 == 0:
-                    lat_key = next((k for k in ["GNSS_LAT", "lat", "LAT", "latitude"] if k in enriched), None)
-                    lon_key = next((k for k in ["GNSS_LON", "lon", "LON", "longitude"] if k in enriched), None)
-                    
-                    if lat_key and lon_key:
-                        lat, lon = enriched.get(lat_key), enriched.get(lon_key)
-                        if lat is not None and lon is not None:
-                            self.map_tab.update_position(float(lat), float(lon))
+                # (4) Update Map Tab — every packet; the map moves markers in place
+                lat_key = next((k for k in ["GNSS_LAT", "lat", "LAT", "latitude"] if k in enriched), None)
+                lon_key = next((k for k in ["GNSS_LON", "lon", "LON", "longitude"] if k in enriched), None)
+
+                if lat_key and lon_key:
+                    lat, lon = enriched.get(lat_key), enriched.get(lon_key)
+                    if lat is not None and lon is not None:
+                        self.map_tab.update_position(float(lat), float(lon))
                 
                 # (5) Update data table dynamically
                 new_cols = [k for k in enriched.keys() if k not in self.table_columns]

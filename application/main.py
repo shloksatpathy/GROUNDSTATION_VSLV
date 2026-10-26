@@ -2,7 +2,7 @@ import os
 import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QShortcut, QFileDialog
-from PyQt5.QtGui import QIcon, QPalette, QColor, QKeySequence
+from PyQt5.QtGui import QIcon, QPalette, QColor, QKeySequence, QSurfaceFormat
 
 from ui.dashboard_tab import DashboardTab
 from ui.map_tab import MapTab
@@ -19,8 +19,6 @@ class GroundStation(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("VSSSIC Ground Station V3")
-        if replay_path:
-            self.setWindowTitle(f"VSSSIC Ground Station V3 — REPLAY: {os.path.basename(replay_path)}")
         self.resize(1500, 950)
 
         # Load icon from project root
@@ -53,7 +51,7 @@ class GroundStation(QMainWindow):
 
         self.setCentralWidget(self.tabs)
 
-        # Hidden replay: Ctrl+Alt+H opens a replica window fed from a CSV
+        # Replay: Ctrl+Alt+H opens a replica of this window fed from a CSV
         self.replay_window = None
         if not replay_path:
             QShortcut(QKeySequence("Ctrl+Alt+H"), self, activated=self.open_replay)
@@ -120,6 +118,11 @@ def apply_dark_theme(app):
 def main():
     """Console/GUI entry point. Kept in sync with run.py."""
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    # No vsync: with the 3D view on screen every repaint is GL-composited, and
+    # waiting on vblank each time throttles the whole event loop (~6 FPS).
+    fmt = QSurfaceFormat.defaultFormat()
+    fmt.setSwapInterval(0)
+    QSurfaceFormat.setDefaultFormat(fmt)
     app = QApplication(sys.argv)
     apply_dark_theme(app)
 
