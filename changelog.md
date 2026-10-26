@@ -239,11 +239,40 @@ view was added, and the whole thing is now shipped as a standalone executable.
 
 ---
 
+## [v2.2.0-competition] – Telemetry Replay & Two-Stage Drop Simulation
+### Added — Replay
+- Ctrl+Alt+H opens a CSV picker, then a second window that is an exact replica
+  of the live window (same title, tabs and controls) fed from the file instead
+  of serial; no replay button is added to the GUI
+- Connect starts playback immediately; Disconnect stops it, Connect restarts it
+- Simulation files replay at 10 Hz; recorded flight CSVs replay at their real
+  `TIMESTAMP` spacing, scheduled against the start time so timer latency never
+  accumulates
+- The live window keeps running alongside the replay
+
+### Added — Simulation
+- `simulation/cansat_drone_drop_1000m.csv` regenerated at 10 Hz: release from a
+  drone at 1000 m, primary parachute deployed at the top settling at 11 m/s,
+  secondary parachute at 600 m settling at 5 m/s, landing at ~159 s
+
+### Changed
+- Map tab loads once and moves markers, geodesic line and distance label in
+  place on every packet, instead of reloading both pages every 20 packets
+- OpenGL vsync disabled at startup — with the 3D attitude view on screen every
+  repaint was GL-composited and waiting on vblank throttled the whole event
+  loop to ~6 FPS
+
+### Impact
+- Plots, attitude view and map follow telemetry without lag or flicker
+- Recorded flights and simulated drops can be reviewed in the same UI as a
+  live flight, without disturbing the live connection
+
+---
+
 # 🚀 Upcoming (Planned)
 
-## [v2.2.0] – Advanced Telemetry
+## [v2.3.0] – Advanced Telemetry
 - Anomaly detection
-- Telemetry replay mode
 
 ---
 
